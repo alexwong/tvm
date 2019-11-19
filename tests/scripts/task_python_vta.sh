@@ -27,6 +27,12 @@ rm -rf ~/.tvm
 # Rebuild cython
 make cython3
 
+# Install PyTorch for testing in CI/CD
+echo "Installing PyTorch dependencies for testing..."
+pip3 install future --user
+
+export PYTHONPATH=$PYTHONPATH:.local/lib/python3.6/site-packages
+
 # Run unit tests in functional/fast simulator
 echo "Running unittest in fsim..."
 python3 -m pytest -v vta/tests/python/unittest
