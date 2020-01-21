@@ -59,7 +59,7 @@ def load_single_op(model_name):
     """Given a model name, returns a single-operator model in eval
     mode as well as an example input."""
     model = getattr(single_op, model_name)().float().eval()
-    input_shape = [1, 512, 224, 224]
+    input_shape = [1, 3, 224, 224]
     input_data = torch.rand(input_shape).float()
     return model, input_data
 
@@ -97,32 +97,6 @@ def load_pretrainedmodels(model_name):
 
 def load_model(model_name):
     """Given a model name, returns a model as well as an example input."""
-    if model_name == 'vgg_test':
-        height = width = 224
-        mean = [0.485, 0.456, 0.406]
-        std = [0.229, 0.224, 0.225]
-        input_shape = [1, 3, height, width]
-        input_data = torch.randn(input_shape).float()
-        for channel in range(3):
-            input_data[:, channel] -= mean[channel]
-            input_data[:, channel] /= std[channel]
-        import vgg_test
-        model = vgg_test.vgg11(pretrained=True)
-        model = model.float().eval()
-        return model, input_data
-    if model_name == 'vgg_temp':
-        height = width = 224
-        mean = [0.485, 0.456, 0.406]
-        std = [0.229, 0.224, 0.225]
-        input_shape = [1, 3, height, width]
-        input_data = torch.randn(input_shape).float()
-        for channel in range(3):
-            input_data[:, channel] -= mean[channel]
-            input_data[:, channel] /= std[channel]
-        import vgg_temp
-        model = vgg_temp.vgg11(pretrained=True)
-        model = model.float().eval()
-        return model, input_data
     if hasattr(single_op, model_name):
         return load_single_op(model_name)
     if hasattr(torchvision.models, model_name):
@@ -194,11 +168,7 @@ def verify_model(model_name):
     if isinstance(baseline_outputs, tuple):
         baseline_outputs = tuple(out.detach().cpu().numpy() for out in baseline_outputs)
     else:
-        if model_name == 'vgg_test':
-            saved_output = baseline_outputs
-            baseline_outputs = baseline_outputs[3]
-        else:
-            baseline_outputs = (baseline_outputs.detach().float().cpu().numpy(),)
+        baseline_outputs = (baseline_outputs.detach().float().cpu().numpy(),)
     output_shapes = [out.shape for out in baseline_outputs]
     dtype = 'float32'
     input_name = 'input0'
@@ -211,11 +181,11 @@ def verify_model(model_name):
         trace = trace.cpu()
 
     print(model_name)
-    print(trace.graph)
+    #print(trace.graph)
 
     mod, params = relay.frontend.from_pytorch_neo(trace, input_shapes)
 
-    print(mod)
+    #print(mod)
     #print(params)
 
     compiled_input = {input_name: tvm.nd.array(baseline_input.cpu().numpy())}
@@ -306,9 +276,6 @@ def test_adaptiveavgpool2d2():
 
 def test_adaptiveavgpool2d3():
     verify_model('AdaptiveAvgPool2D3')
-
-def test_adaptiveavgpool2d4():
-    verify_model('AdaptiveAvgPool2D4')
 
 def test_maxpool2d1():
     verify_model('MaxPool2D1')
@@ -418,12 +385,6 @@ def test_squeezenet1_0():
 
 def test_squeezenet1_1():
     verify_model('squeezenet1_1')
-
-def test_vgg():
-    verify_model('vgg_test')
-
-def test_vgg_temp():
-    verify_model('vgg_temp')
 
 def test_vgg11():
     verify_model('vgg11')
@@ -570,14 +531,14 @@ if __name__ == '__main__':
     #test_shufflenet_v2_x1_0()
     """
 
-    test_vgg_temp()
-    #test_vgg()
+    test_resnet18()
     test_vgg11()
-
-    #test_adaptiveavgpool2d1()
-    #test_adaptiveavgpool2d2()
-    #test_adaptiveavgpool2d3()
-    #test_adaptiveavgpool2d4()
+    test_mobilenet_v2()
+    test_densenet121()
+    test_inception_v3()
+    test_alexnet()
+    test_googlenet()
+    test_mnasnet0_5()
 
     """
     test_vgg13()
@@ -587,4 +548,47 @@ if __name__ == '__main__':
     test_vgg13_bn()
     test_vgg19_bn()
     test_alexnet()
+    """
+
+    model_name_to_op = {}
+    model_name_to_t_ops = {}
+    model_names = ['resnet18', 'vgg11', 'mobilenet_v2', 'densenet121', 'inception_v3', 'alexnet', 'googlenet', 'mnasnet0_5']
+
+    for model_name in model_names:
+        print(model_name)
+        model, data = load_torchvision(model_name)
+
+        graph = torch.jit.trace(model, data).graph
+
+        op_list = {}
+        t_list = []
+        for node in graph.nodes():
+            if not node.kind() in op_list:
+                op_list[node.kind()] = 1
+            else:
+                op_list[node.kind()] = op_list[node.kind()]+1
+
+            if node.kind() == 'aten::adaptive_avg_pool2d':
+                t_list.append(node)
+
+        model_name_to_op[model_name] = op_list
+        model_name_to_t_ops[model_name] = t_list
+
+    #print(model_name_to_op)
+    for model in model_name_to_op:
+        print('ops in '+model)
+        #print(model)
+        print(model_name_to_op[model])
+        print('t ops in '+model)
+        print(model_name_to_t_ops[model])
+
+    """
+    print('check what models vgg has in common with everything')
+    vgg_intersect = {}
+
+    for model in model_names:
+        if model_name != 'vgg11':
+            common_ops = []
+            for op in model_name_to_op['vgg11']:
+                if 
     """

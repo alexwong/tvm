@@ -35,9 +35,11 @@ def test_mlp():
 def test_vgg():
     shape = {"data": (1, 3, 224, 224)}
     for n in [11, 13, 16, 19]:
+        print(n)
         mx_sym = model_zoo.mx_vgg(n)
         mod, _ = relay.frontend.from_mxnet(mx_sym, shape=shape)
         relay_mod = model_zoo.relay_vgg(n)
+        print(relay_mod)
         compare_graph(mod, relay_mod)
 
 
@@ -109,6 +111,7 @@ def test_multi_outputs():
 
 
 if __name__ == "__main__":
+    """
     test_mlp()
     test_resnet()
     test_vgg()
@@ -117,3 +120,6 @@ if __name__ == "__main__":
     test_dcgan()
     test_squeezenet()
     test_inception_v3()
+    """
+
+    test_vgg()

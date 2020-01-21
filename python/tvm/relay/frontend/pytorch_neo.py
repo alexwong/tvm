@@ -151,6 +151,11 @@ def _adaptive_avg_2d():
         data = inputs[0]
         output_size = _infer_shape(inputs[1])
 
+        print('adaptive_avg')
+        print(_infer_shape(data))
+        print('outputsize')
+        print(output_size)
+
         return _op.contrib.contrib.adaptive_avg_pool2d(
             data,
             output_size=output_size)
@@ -158,6 +163,9 @@ def _adaptive_avg_2d():
 
 def _adaptive_max_2d():
     def _impl(inputs):
+
+        print(inputs)
+
         data = inputs[0]
         output_size = _infer_shape(inputs[1])
 
@@ -365,8 +373,6 @@ def _transpose():
             if ndims >= 2:
                 axes[-1] = ndims - 2
                 axes[-2] = ndims - 1
-            if not isinstance(data, _expr.Var):
-                data = _expr.const(data, dtype='float32')
 
         elif num_inputs == 3:
             parse = lambda i: ndims * (i < 0) + i

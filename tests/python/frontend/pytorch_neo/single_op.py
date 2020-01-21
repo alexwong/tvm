@@ -130,6 +130,10 @@ class AdaptiveAvgPool2D1(Module):
     def forward(self, *args):
         return torch.nn.AdaptiveAvgPool2d([1, 1])(args[0])
 
+class AdaptiveAvgPool2D4(Module):
+    def forward(self, *args):
+        return torch.nn.AdaptiveAvgPool2d([7, 7])(args[0])
+
 class AdaptiveAvgPool2D2(Module):
     def forward(self, *args):
         return torch.nn.AdaptiveAvgPool2d([100, 100])(args[0])
