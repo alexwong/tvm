@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from utils import load_state_dict_from_url
+import collections
 
 
 __all__ = [
@@ -25,6 +26,7 @@ class VGG(nn.Module):
 
     def __init__(self, features, num_classes=1000, init_weights=True):
         super(VGG, self).__init__()
+        self.outputs = collections.OrderedDict()
         self.features = features
         self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
         self.classifier = nn.Sequential(
@@ -40,12 +42,34 @@ class VGG(nn.Module):
             self._initialize_weights()
 
     def forward(self, x):
-        x = self.features(x)
-        #x = self.avgpool(x)
-        #x = torch.flatten(x, 1)
-        #x = self.classifier(x)
+
+
+        cnt = 0
+        for l in list(self.features):
+
+            print(l)
+            print(type(l))
+
+            x = l(x)
+            self.outputs[l.__str__()+str(cnt)] = x
+            cnt = cnt+1
+
+        x = self.avgpool(x)
+
+        self.outputs[self.avgpool.__str__()+str(cnt)] = x
+        cnt = cnt+1
+
+        x = torch.flatten(x, 1)
+        self.outputs[torch.flatten.__name__+str(cnt)] = x
+        cnt = cnt+1
+
+        for l in list(self.classifier):
+            x = l(x)
+            self.outputs[l.__str__()+str(cnt)] = x
+            cnt = cnt+1
 
         output = x
+        print(self.outputs)
         return output
 
     def _initialize_weights(self):
@@ -93,6 +117,9 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
+
+        print(state_dict.keys())
+
         model.load_state_dict(state_dict)
     return model
 
