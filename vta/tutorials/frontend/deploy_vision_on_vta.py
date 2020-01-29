@@ -34,7 +34,7 @@ tensorization in the core) to massage the compute graph for the hardware target.
 #
 # .. code-block:: bash
 #
-#   pip3 install --user mxnet requests pillow
+#   pip3 install --user mxnet requests "Pillow<7"
 #
 # Now return to the python code. Import packages.
 
@@ -225,10 +225,11 @@ synset = eval(open(categ_fn).read())
 
 # Download test image
 image_url = 'https://homes.cs.washington.edu/~moreau/media/vta/cat.jpg'
-response = requests.get(image_url)
+image_fn = 'cat.png'
+download.download(image_url, image_fn)
 
 # Prepare test image for inference
-image = Image.open(BytesIO(response.content)).resize((224, 224))
+image = Image.open(image_fn).resize((224, 224))
 plt.imshow(image)
 plt.show()
 image = np.array(image) - np.array([123., 117., 104.])

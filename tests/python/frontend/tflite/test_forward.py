@@ -225,6 +225,26 @@ def test_forward_split():
     _test_split((1, 3, 5, 6), -1, 3, 'float32')
 
 #######################################################################
+# slice
+# -----
+
+def _test_slice(data, begin, size):
+    """ One iteration of SLICE """
+    with tf.Graph().as_default():
+        in_data = array_ops.placeholder(shape=data.shape, dtype=data.dtype)
+        out = array_ops.slice(in_data, begin, size)
+        compare_tflite_with_tvm(data, 'Placeholder:0', [in_data], [out])
+
+def test_forward_slice():
+    """ SLICE """
+    _test_slice(np.arange(4, dtype=np.float32).reshape((4, )), begin=[0], size=[2])
+    _test_slice(np.arange(18, dtype=np.int32).reshape((3, 2, 3)), begin=[1, 0, 0], size=[1, 1, 3])
+    # tflite 1.13 outputs nonsense values if size[i] == -1
+    if package_version.parse(tf.VERSION) >= package_version.parse('1.14.0'):
+        _test_slice(np.arange(8, dtype=np.int32).reshape((2, 4)), begin=[0, 1], size=[-1, -1])
+        _test_slice(np.arange(5, dtype=np.int32).reshape((5, )), begin=[4], size=[-1])
+
+#######################################################################
 # transpose
 # ---------
 
@@ -616,6 +636,109 @@ def test_forward_concatenation():
          np.arange(6).reshape((2, 1, 1, 3)),
          np.arange(6).reshape((2, 1, 1, 3))], 1)
 
+#######################################################################
+# Unary elemwise
+# --------------
+
+def _test_unary_elemwise(math_op, data):
+    """ One iteration of unary elemwise """
+
+    with tf.Graph().as_default():
+        in_data = array_ops.placeholder(shape=data.shape, dtype=data.dtype, name='in')
+        out = math_op(in_data)
+        compare_tflite_with_tvm(data, ['in:0'], in_data, [out])
+
+#######################################################################
+# Abs
+# ---
+
+def _test_abs(data):
+    """ One iteration of abs """
+    return _test_unary_elemwise(math_ops.abs, data)
+#######################################################################
+# Ceil
+# ----
+
+def _test_ceil(data):
+    """ One iteration of ceil """
+    return _test_unary_elemwise(math_ops.ceil, data)
+#######################################################################
+# Floor
+# -----
+
+def _test_floor(data):
+    """ One iteration of floor """
+    return _test_unary_elemwise(math_ops.floor, data)
+#######################################################################
+# Exp
+# ---
+
+def _test_exp(data):
+    """ One iteration of exp """
+    return _test_unary_elemwise(math_ops.exp, data)
+#######################################################################
+# Log
+# ---
+
+def _test_log(data):
+    """ One iteration of log """
+    return _test_unary_elemwise(math_ops.log, data)
+#######################################################################
+# Sin
+# ---
+
+def _test_sin(data):
+    """ One iteration of sin """
+    return _test_unary_elemwise(math_ops.sin, data)
+#######################################################################
+# Cos
+# ---
+
+def _test_cos(data):
+    """ One iteration of cos """
+    return _test_unary_elemwise(math_ops.cos, data)
+#######################################################################
+# Sqrt
+# ----
+
+def _test_sqrt(data):
+    """ One iteration of sqrt """
+    return _test_unary_elemwise(math_ops.sqrt, data)
+#######################################################################
+# Rsqrt
+# -----
+
+def _test_rsqrt(data):
+    """ One iteration of rsqrt """
+    return _test_unary_elemwise(math_ops.rsqrt, data)
+#######################################################################
+# Neg
+# ---
+
+def _test_neg(data):
+    """ One iteration of neg """
+    return _test_unary_elemwise(math_ops.neg, data)
+#######################################################################
+
+def _test_forward_unary_elemwise(test_op):
+    # functions that need positive input
+    if test_op in {'_test_log', '_test_sqrt', '_test_rsqrt'}:
+        test_op(np.arange(6.0, dtype=np.float32).reshape((2, 1, 3)))
+        test_op(np.arange(6.0, dtype=np.int32).reshape((2, 1, 3)))
+    else:
+        np.array(np.random.uniform(-5, 5, (3, 1)), dtype=np.int32)
+
+def test_all_unary_elemwise():
+    _test_forward_unary_elemwise(_test_abs)
+    _test_forward_unary_elemwise(_test_ceil)
+    _test_forward_unary_elemwise(_test_floor)
+    _test_forward_unary_elemwise(_test_exp)
+    _test_forward_unary_elemwise(_test_log)
+    _test_forward_unary_elemwise(_test_sin)
+    _test_forward_unary_elemwise(_test_cos)
+    _test_forward_unary_elemwise(_test_sqrt)
+    _test_forward_unary_elemwise(_test_rsqrt)
+    _test_forward_unary_elemwise(_test_neg)
 
 #######################################################################
 # Element-wise
@@ -663,6 +786,24 @@ def _test_elemwise(math_op, data, fused_activation_function=None, quantized=Fals
             out = math_op(in_data[0], ops.convert_to_tensor(data[1], dtype=data[1].dtype))
             out = with_fused_activation_function(out, fused_activation_function)
             compare_tflite_with_tvm(data[0], ['in_0:0'], in_data, [out])
+
+    # Test with constant and tensor
+    with tf.Graph().as_default():
+        in_data = [array_ops.placeholder(shape=data[1].shape, dtype='float32', name='in_1')]
+
+        if quantized:
+            inq_const = tf.quantization.fake_quant_with_min_max_args(data[0], min=-100, max=100, name="const_tensor")
+            inq_data = [tf.quantization.fake_quant_with_min_max_args(in_data[0], min=-100, max=100, name="inq_1")]
+            # the 1st tensor is treated as constant and directly added as part of the operation
+            out = math_op(ops.convert_to_tensor(inq_const, dtype='float32', name='inq_const'), inq_data)
+            out = with_fused_activation_function(out, fused_activation_function)
+            out_min, out_max = _test_elemwise_qnn_out_range(qnn_op)
+            out = tf.quantization.fake_quant_with_min_max_args(out, min=out_min, max=out_max, name="out")
+            compare_tflite_with_tvm(data[1], ['inq_1:0'], inq_data, [out], quantized=True)
+        else:
+            out = math_op(ops.convert_to_tensor(data[0], dtype=data[0].dtype), in_data[0])
+            out = with_fused_activation_function(out, fused_activation_function)
+            compare_tflite_with_tvm(data[1], ['in_1:0'], in_data, [out])
 
 #######################################################################
 # Add
@@ -723,6 +864,14 @@ def _test_greater(data):
     """ One iteration of greater """
     return _test_elemwise(math_ops.greater, data)
 
+#######################################################################
+# Squared_difference
+# ------------------
+
+def _test_squared_difference(data):
+    """ One iteration of squared difference """
+    return _test_elemwise(math_ops.squared_difference, data)
+
 def _test_forward_elemwise(testop):
     """ Elewise"""
     testop([np.arange(6.0, dtype=np.float32).reshape((2, 1, 1, 3)),
@@ -765,6 +914,7 @@ def test_all_elemwise():
     _test_forward_elemwise(_test_maximum)
     _test_forward_elemwise(_test_minimum)
     _test_forward_elemwise(_test_greater)
+    _test_forward_elemwise(_test_squared_difference)
 
 #######################################################################
 # Zeros like
@@ -1030,7 +1180,7 @@ def _test_tanh(data):
     """ One iteration of TANH """
     with tf.Graph().as_default():
         in_data = array_ops.placeholder(shape=data.shape, dtype=data.dtype)
-        out = math_ops.sigmoid(in_data)
+        out = math_ops.tanh(in_data)
         compare_tflite_with_tvm(data, 'Placeholder:0', [in_data], [out])
 
 def test_forward_tanh():
@@ -1305,6 +1455,7 @@ if __name__ == '__main__':
     test_forward_reshape()
     test_all_resize()
     test_forward_squeeze()
+    test_forward_slice()
 
     # NN
     test_forward_convolution()
@@ -1319,6 +1470,9 @@ if __name__ == '__main__':
 
     # Elemwise
     test_all_elemwise()
+
+    # Unary elemwise
+    test_all_unary_elemwise()
 
     # Zeros Like
     test_forward_zeros_like()

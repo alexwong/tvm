@@ -78,7 +78,8 @@ class PassContext(RelayNode):
                  opt_level=2,
                  fallback_device=_nd.cpu(),
                  required_pass=None,
-                 disabled_pass=None):
+                 disabled_pass=None,
+                 trace=None):
         if isinstance(fallback_device, str):
             fallback_device = _nd.context(fallback_device).device_type
         elif isinstance(fallback_device, TVMContext):
@@ -99,7 +100,7 @@ class PassContext(RelayNode):
 
         self.__init_handle_by_constructor__(_transform.PassContext, opt_level,
                                             fallback_device, required,
-                                            disabled)
+                                            disabled, trace)
 
     def __enter__(self):
         _transform.EnterPassContext(self)
@@ -117,7 +118,8 @@ class PassContext(RelayNode):
 def build_config(opt_level=2,
                  fallback_device=_nd.cpu(),
                  required_pass=None,
-                 disabled_pass=None):
+                 disabled_pass=None,
+                 trace=None):
     """Configure the build behavior by setting config variables.
 
     Parameters
@@ -151,13 +153,16 @@ def build_config(opt_level=2,
     disabled_pass: set of str, optional
         Optimization passes to be disabled during optimization.
 
+    trace: Callable[[IRModule, PassInfo, bool], None]
+        A tracing function for debugging or introspection.
+
     Returns
     -------
     pass_context: PassContext
         The pass context for optimizations.
     """
     return PassContext(opt_level, fallback_device, required_pass,
-                       disabled_pass)
+                       disabled_pass, trace)
 
 
 @register_relay_node
@@ -460,6 +465,34 @@ def AlterOpLayout():
     return _transform.AlterOpLayout()
 
 
+def ConvertLayout(desired_layout):
+    """ Given a dest layout, this pass transforms the expr such that most of the ops input data
+    layout is changed to the dest layout. In ideal situation, there are only 2 layout transforms,
+    one at the start and one at the end.
+
+    This pass is not a part of relay.build and is expected to be called between framework-relay
+    parser and relay.build call. This is very helpful for hardware backends that support/prefer only
+    type of data layout.
+
+    RFC - https://discuss.tvm.ai/t/layout-conversion-pass/4009
+
+    This pass uses most of the AlterOpLayout and InferCorrectLayout infrastructure. We can define
+    new layouts for conv2d ops for now. Most of the other operators try to adapt to their input
+    layout using the InferCorrectLayout infrastructure.
+
+    Parameters
+    ----------
+    desired_layout : str
+      The desired layout for the transformed expr.
+
+    Returns
+    -------
+    pass: FunctionPass
+      The pass.
+    """
+    return _transform.ConvertLayout(desired_layout)
+
+
 def Legalize(legalize_map_attr_name="FTVMLegalize"):
     """Legalizes an expression with another expression.
     This pass can be used to replace an expr with another expr for target
@@ -633,6 +666,18 @@ def PrintIR(show_meta_data=True):
         The registered pass that prints the module IR.
     """
     return _transform.PrintIR(show_meta_data)
+
+
+def PartitionGraph():
+    """Partition a Relay program into regions that can be executed on different
+    backends.
+
+    Returns
+    -------
+    ret: tvm.relay.Pass
+        The registered pass that partitions the Relay program.
+    """
+    return _transform.PartitionGraph()
 
 
 def gradient(expr, mod=None, mode='higher_order'):

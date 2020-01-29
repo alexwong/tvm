@@ -56,9 +56,9 @@ def veval(f, *args, ctx=tvm.cpu(), target="llvm"):
     return vm.invoke("main", *args)
 
 def vmobj_to_list(o):
-    if isinstance(o, tvm.relay.backend.vm.Tensor):
+    if isinstance(o, tvm.nd.NDArray):
         return [o.asnumpy().tolist()]
-    elif isinstance(o, tvm.relay.backend.vm.ADT):
+    elif isinstance(o, tvm.container.ADT):
         result = []
         for f in o:
             result.extend(vmobj_to_list(f))
@@ -572,4 +572,4 @@ def test_add_op_broadcast():
 
 
 if __name__ == "__main__":
-    pytest.main()
+    pytest.main([__file__])
