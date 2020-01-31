@@ -211,6 +211,23 @@ def verify_model(model_name, input_data=[]):
     del model_name
     del baseline_model
     torch.cuda.empty_cache()
+    cpuStats()
+    memReport()
+
+# Memory checking
+def memReport():
+    for obj in gc.get_objects():
+        if torch.is_tensor(obj):
+            print(type(obj), obj.size())
+
+def cpuStats():
+    print(sys.version)
+    print(psutil.cpu_percent())
+    print(psutil.virtual_memory())  # physical memory usage
+    pid = os.getpid()
+    py = psutil.Process(pid)
+    memoryUse = py.memory_info()[0] / 2. ** 30  # memory use in GB...I think
+    print('memory GB:', memoryUse)
 
 # Single operator tests
 def test_forward_add():
@@ -253,6 +270,11 @@ def test_forward_add():
     verify_model(Add4().float().eval(), input_data=input_data)
     verify_model(Add5().float().eval(), input_data=input_data)
 
+def test_forward_add1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
+
 def test_forward_subtract():
     input_shape = [1, 3, 224, 224]
 
@@ -293,6 +315,11 @@ def test_forward_subtract():
     verify_model(Subtract4().float().eval(), input_data=input_data)
     verify_model(Subtract5().float().eval(), input_data=input_data)
 
+def test_forward_subtract1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
+
 def test_forward_multiply():
     input_shape = [1, 3, 224, 224]
 
@@ -332,6 +359,11 @@ def test_forward_multiply():
     verify_model(Multiply4().float().eval(), input_data=input_data)
     verify_model(Multiply5().float().eval(), input_data=input_data)
 
+def test_forward_multiply1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
+
 def test_forward_unsqueeze():
     input_shape = [1, 3, 224, 224]
 
@@ -341,6 +373,11 @@ def test_forward_unsqueeze():
 
     input_data = torch.rand(input_shape).float()
     verify_model(Unsqueeze1().float().eval(), input_data=input_data)
+
+def test_forward_unsqueeze1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
 
 def test_forward_concatenate():
     input_shape = [1, 3, 224, 224]
@@ -360,6 +397,11 @@ def test_forward_concatenate():
     verify_model(Concatenate1().float().eval(), input_data=input_data)
     verify_model(Concatenate2().float().eval(), input_data=input_data)
 
+def test_forward_concatenate1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
+
 def test_forward_relu():
     input_shape = [1, 3, 224, 224]
 
@@ -369,6 +411,11 @@ def test_forward_relu():
 
     input_data = torch.rand(input_shape).float()
     verify_model(ReLU1().float().eval(), input_data=input_data)
+
+def test_forward_relu1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
 
 def test_forward_adaptiveavgpool1():
     input_shape = [1, 3, 224, 224]
@@ -380,6 +427,11 @@ def test_forward_adaptiveavgpool1():
     input_data = torch.rand(input_shape).float()
     verify_model(AdaptiveAvgPool2D1().float().eval(), input_data=input_data)
 
+def test_forward_adaptiveavgpool11():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
+
 def test_forward_adaptiveavgpool2():
     input_shape = [1, 3, 224, 224]
 
@@ -389,6 +441,11 @@ def test_forward_adaptiveavgpool2():
 
     input_data = torch.rand(input_shape).float()
     verify_model(AdaptiveAvgPool2D2().float().eval(), input_data=input_data)
+
+def test_forward_adaptiveavgpool21():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
 
 def test_forward_adaptiveavgpool3():
     input_shape = [1, 3, 224, 224]
@@ -400,6 +457,11 @@ def test_forward_adaptiveavgpool3():
     input_data = torch.rand(input_shape).float()
     verify_model(AdaptiveAvgPool2D3().float().eval(), input_data=input_data)
 
+def test_forward_adaptiveavgpool31():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
+
 def test_forward_maxpool1():
     input_shape = [1, 3, 224, 224]
 
@@ -409,6 +471,11 @@ def test_forward_maxpool1():
 
     input_data = torch.rand(input_shape).float()
     verify_model(MaxPool2D1().float().eval(), input_data=input_data)
+
+def test_forward_maxpool11():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
 
 def test_forward_maxpool2():
     input_shape = [1, 3, 224, 224]
@@ -420,6 +487,11 @@ def test_forward_maxpool2():
     input_data = torch.rand(input_shape).float()
     verify_model(MaxPool2D2().float().eval(), input_data=input_data)
 
+def test_forward_maxpool21():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
+
 def test_forward_maxpool3():
     input_shape = [1, 3, 224, 224]
 
@@ -429,6 +501,11 @@ def test_forward_maxpool3():
 
     input_data = torch.rand(input_shape).float()
     verify_model(MaxPool2D3().float().eval(), input_data=input_data)
+
+def test_forward_maxpool31():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
 
 def test_forward_avgpool():
     input_shape = [1, 3, 224, 224]
@@ -440,6 +517,11 @@ def test_forward_avgpool():
     input_data = torch.rand(input_shape).float()
     verify_model(AvgPool2D1().float().eval(), input_data=input_data)
 
+def test_forward_avgpool1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
+
 def test_forward_hardtanh():
     input_shape = [1, 3, 224, 224]
 
@@ -449,6 +531,11 @@ def test_forward_hardtanh():
 
     input_data = torch.rand(input_shape).float()
     verify_model(HardTanh1().float().eval(), input_data=input_data)
+
+def test_forward_hardtanh1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
 
 def test_forward_conv():
     input_shape = [1, 3, 224, 224]
@@ -475,6 +562,11 @@ def test_forward_conv():
     verify_model(Conv2D1().float().eval(), input_data=input_data)
     verify_model(Conv2D2().float().eval(), input_data=input_data)
 
+def test_forward_conv1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
+
 def test_forward_threshold():
     input_shape = [1, 3, 224, 224]
 
@@ -485,6 +577,11 @@ def test_forward_threshold():
     input_data = torch.rand(input_shape).float()
     verify_model(Threshold1().float().eval(), input_data=input_data)
 
+def test_forward_threshold1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
+
 def test_forward_contiguous():
     input_shape = [1, 3, 224, 224]
 
@@ -494,6 +591,11 @@ def test_forward_contiguous():
 
     input_data = torch.rand(input_shape).float()
     verify_model(Contiguous1().float().eval(), input_data=input_data)
+
+def test_forward_contiguous1():
+    cpuStats()
+    memReport()
+    raise Exception('Just trying to check memory!')
 
 def test_forward_batchnorm():
     input_shape = [1, 3, 224, 224]
