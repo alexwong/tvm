@@ -221,6 +221,7 @@ def memReport():
             print(type(obj), obj.size())
 
 def cpuStats():
+    import psutil
     print(sys.version)
     print(psutil.cpu_percent())
     print(psutil.virtual_memory())  # physical memory usage
