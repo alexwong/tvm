@@ -216,6 +216,7 @@ def verify_model(model_name, input_data=[]):
 
 # Memory checking
 def memReport():
+    import gc
     for obj in gc.get_objects():
         if torch.is_tensor(obj):
             print(type(obj), obj.size())
