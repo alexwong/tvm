@@ -1441,6 +1441,23 @@ class Resize(OnnxOpConverter):
         return _op.image.resize(inputs[0], out_size, layout, method, coord_trans)
 
 
+class NonZero(OnnxOpConverter):
+    """Operator converter for NonZero
+    """
+    @classmethod
+    def _impl_v11(cls, inputs, attr, params):
+
+        print('nonzero op')
+        for i in inputs:
+                print(i)
+
+        inferred_input = infer_value(inputs[0], params).asnumpy()
+
+        nonzeros = _nd.array([i for i in np.nonzero(inferred_input)])
+        print(nonzeros)
+
+        return _expr.Constant(nonzeros)
+
 # compatible operators that do NOT require any conversion.
 _identity_list = []
 
@@ -1570,6 +1587,7 @@ def _get_convert_map(opset):
         'Where': Where.get_converter(opset),
         'Or': Or.get_converter(opset),
         'Resize': Resize.get_converter(opset),
+        'NonZero': NonZero.get_converter(opset),
     }
 
 
