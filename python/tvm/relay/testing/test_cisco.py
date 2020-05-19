@@ -203,7 +203,7 @@ net = DARKNET_LIB.load_network(cfg_path.encode('utf-8'), weights_path.encode('ut
 build_dtype = {}
 import os
 files = os.listdir('validation')
-imgs = [x for x in temp if '.jpg' in x]
+imgs = [x for x in files if '.jpg' in x]
 imgs = imgs[0:100]
 #imgs = ['000000080708.jpg', '000000164142.jpg', '000000249363.jpg', '000000332876.jpg', '000000417016.jpg', '000000500390.jpg', 'carsgraz_263.jpg', 'person_104.jpg']
 for img in imgs:
