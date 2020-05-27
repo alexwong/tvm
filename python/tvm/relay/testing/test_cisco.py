@@ -127,18 +127,7 @@ def verify_darknet_frontend(net, img_path, build_dtype='float32'):
 
     img = DARKNET_LIB.letterbox_image(DARKNET_LIB.load_image_color(img_path.encode('utf-8'), 0, 0), net.w, net.h)
 
-    """
-    import time
-    start = time.time()
-    for _ in range(1000):
-        response = predictor.predict(payload)
-    neo_inference_time = (time.time()-start)
-    """
-
-    #import time
-    #dn_start = time.time()
     darknet_output = get_darknet_output(net, img)
-    #dn_inference_time = (time.time()-dn_start)
 
     batch_size = 1
     data = np.empty([batch_size, img.c, img.h, img.w], dtype)
@@ -149,9 +138,7 @@ def verify_darknet_frontend(net, img_path, build_dtype='float32'):
                 data[0][c][h][k] = img.data[i]
                 i = i + 1
 
-    #tvm_start = time.time()
     tvm_out = _get_tvm_output(net, data, build_dtype)
-    #tvm_inference_time = (time.time()-tvm_start)
 
     for tvm_outs, darknet_out in zip(tvm_out, darknet_output):
         tvm.testing.assert_allclose(darknet_out, tvm_outs, rtol=1e-3, atol=1e-3)
@@ -216,146 +203,3 @@ print(perf_dict)
 perf_avg = sum(perf_dict.values()) / float(len(perf_dict))
 print('perf_dict avg')
 print(perf_avg)
-
-#verify_darknet_frontend(net, DARKNET_TEST_IMAGE_PATH, build_dtype)
-
-"""
-dtype = 'float32'
-batch_size = 1
-
-data = np.empty([batch_size, net.c, net.h, net.w], dtype)
-shape_dict = {'data': data.shape}
-print("Converting darknet to relay functions...")
-mod, params = relay.frontend.from_darknet(net, dtype=dtype, shape=data.shape)
-
-print(mod)
-import json
-json_str = tvm.ir.save_json(mod)
-with open('darknet_yolo.json', 'w') as outfile:
-    json.dump(json_str, outfile)
-
-######################################################################
-# Import the graph to Relay
-# -------------------------
-# compile the model
-target = 'llvm'
-target_host = 'llvm'
-ctx = tvm.cpu(0)
-data = np.empty([batch_size, net.c, net.h, net.w], dtype)
-shape = {'data': data.shape}
-print("Compiling the model...")
-with relay.build_config(opt_level=3):
-    graph, lib, params = relay.build(mod,
-                                     target=target,
-                                     target_host=target_host,
-                                     params=params)
-
-print(shape)
-
-[neth, netw] = shape['data'][2:] # Current image shape is 608x608
-######################################################################
-# Load a test image
-# -----------------
-"""
-"""
-test_image = 'dog.jpg'
-print("Loading the test image...")
-img_url = REPO_URL + 'data/' + test_image + '?raw=true'
-img_path = download_testdata(img_url, test_image, "data")
-"""
-"""
-img_path = '/Users/wongale/workplace/neo-tvm-pytorch-relay/tvm/validation/000000001518.jpg'
-data = tvm.relay.testing.darknet.load_image(img_path, netw, neth)
-######################################################################
-# Execute on TVM Runtime
-# ----------------------
-# The process is no different from other examples.
-from tvm.contrib import graph_runtime
-
-m = graph_runtime.create(graph, lib, ctx)
-
-# set inputs
-m.set_input('data', tvm.nd.array(data.astype(dtype)))
-m.set_input(**params)
-# execute
-print("Running the test image...")
-
-# detection
-# thresholds
-thresh = 0.5
-nms_thresh = 0.45
-
-m.run()
-# get outputs
-tvm_out = []
-"""
-"""
-if MODEL_NAME == 'yolov2':
-    layer_out = {}
-    layer_out['type'] = 'Region'
-    # Get the region layer attributes (n, out_c, out_h, out_w, classes, coords, background)
-    layer_attr = m.get_output(2).asnumpy()
-    layer_out['biases'] = m.get_output(1).asnumpy()
-    out_shape = (layer_attr[0], layer_attr[1]//layer_attr[0],
-                 layer_attr[2], layer_attr[3])
-    layer_out['output'] = m.get_output(0).asnumpy().reshape(out_shape)
-    layer_out['classes'] = layer_attr[4]
-    layer_out['coords'] = layer_attr[5]
-    layer_out['background'] = layer_attr[6]
-    tvm_out.append(layer_out)
-
-elif MODEL_NAME == 'yolov3':
-    for i in range(3):
-        layer_out = {}
-        layer_out['type'] = 'Yolo'
-        # Get the yolo layer attributes (n, out_c, out_h, out_w, classes, total)
-        layer_attr = m.get_output(i*4+3).asnumpy()
-        layer_out['biases'] = m.get_output(i*4+2).asnumpy()
-        layer_out['mask'] = m.get_output(i*4+1).asnumpy()
-        out_shape = (layer_attr[0], layer_attr[1]//layer_attr[0],
-                     layer_attr[2], layer_attr[3])
-        layer_out['output'] = m.get_output(i*4).asnumpy().reshape(out_shape)
-        layer_out['classes'] = layer_attr[4]
-        tvm_out.append(layer_out)
-
-elif MODEL_NAME == 'yolov3-tiny':
-    for i in range(2):
-        layer_out = {}
-        layer_out['type'] = 'Yolo'
-        # Get the yolo layer attributes (n, out_c, out_h, out_w, classes, total)
-        layer_attr = m.get_output(i*4+3).asnumpy()
-        layer_out['biases'] = m.get_output(i*4+2).asnumpy()
-        layer_out['mask'] = m.get_output(i*4+1).asnumpy()
-        out_shape = (layer_attr[0], layer_attr[1]//layer_attr[0],
-                     layer_attr[2], layer_attr[3])
-        layer_out['output'] = m.get_output(i*4).asnumpy().reshape(out_shape)
-        layer_out['classes'] = layer_attr[4]
-        tvm_out.append(layer_out)
-        thresh = 0.560
-"""
-
-"""
-# do the detection and bring up the bounding boxes
-img = tvm.relay.testing.darknet.load_image_color(img_path)
-_, im_h, im_w = img.shape
-dets = tvm.relay.testing.yolo_detection.fill_network_boxes((netw, neth), (im_w, im_h), thresh,
-                                                           1, tvm_out)
-last_layer = net.layers[net.n - 1]
-tvm.relay.testing.yolo_detection.do_nms_sort(dets, last_layer.classes, nms_thresh)
-
-coco_name = 'coco.names'
-coco_url = REPO_URL + 'data/' + coco_name + '?raw=true'
-font_name = 'arial.ttf'
-font_url = REPO_URL + 'data/' + font_name + '?raw=true'
-coco_path = download_testdata(coco_url, coco_name, module='data')
-font_path = download_testdata(font_url, font_name, module='data')
-
-with open(coco_path) as f:
-    content = f.readlines()
-
-names = [x.strip() for x in content]
-
-tvm.relay.testing.yolo_detection.draw_detections(font_path, img, dets, thresh, names, last_layer.classes)
-plt.imshow(img.transpose(1, 2, 0))
-plt.show()
-"""
