@@ -1729,6 +1729,13 @@ def _one_hot():
     return _impl
 
 
+def _roi_align():
+    def _impl(inputs, input_types):
+        print('in roi allign')
+        print(inputs)
+    return _impl
+
+
 # Helper functions for operator implementation
 def _convert_dtype_value(val):
     convert_torch_dtype_map = {7:"torch.float64",
@@ -1970,6 +1977,7 @@ def _get_convert_map(prelude):
         "aten::__getitem__"                     : _list_getitem(prelude),
         "aten::len"                             : _list_len(prelude),
         "aten::type_as"                         : _type_as(),
+        "torchvision::roi_align"                : _roi_align(),
     }
     return convert_map
 
@@ -2524,7 +2532,7 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None):
         convert_map.update(custom_convert_map)
 
     op_names = get_all_op_names(graph)
-    _report_missing_conversion(op_names, convert_map)
+    #_report_missing_conversion(op_names, convert_map)
     _check_inputs(graph, input_shapes)
 
     params = script_module.state_dict()
