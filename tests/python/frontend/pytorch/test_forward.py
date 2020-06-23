@@ -2397,6 +2397,48 @@ def test_forward_matmul():
     verify_model(MatMul1().float().eval(), input_data=[tensor1, tensor2])
 
 
+def test_forward_roi_align():
+    torch.set_grad_enabled(False)
+
+    class RoiAllign1(Module):
+        def forward(self, *args):
+            import torchvision
+            return torchvision.ops.roi_align(args[0], args[1], 7)
+
+    tensor1 = torch.randn(1, 4, 16, 16)
+    tensor2 = torch.randn(32, 5)
+    verify_model(RoiAllign1().float().eval(), input_data=[tensor1, tensor2], rtol=1e-05, atol=1e-05)
+
+
+def test_forward_index():
+    torch.set_grad_enabled(False)
+
+    class Index1(Module):
+        def forward(self, *args):
+            tensor = args[0]
+            index = args[1]
+            return tensor[index]
+
+    tensor1 = torch.randn(10)
+    index = 1
+    verify_model(Index1().float().eval(), input_data=[tensor1, index])
+
+
+def test_forward_copy():
+    torch.set_grad_enabled(False)
+
+    class Copy1(Module):
+        def forward(self, *args):
+            tensor = args[0]
+            index = args[1]
+            return tensor[index]
+
+    tensor1 = torch.randn(10)
+    index = 1
+    verify_model(Index1().float().eval(), input_data=[tensor1, index])
+
+
+
 def test_forward_pretrained_bert_base_uncased():
     ######################################################################
     # This is an example how to run BERT models using TVM
@@ -2526,6 +2568,7 @@ def test_forward_pretrained_bert_base_uncased():
 
 
 if __name__ == "__main__":
+    """
     # Single operator tests
     test_forward_add()
     test_forward_subtract()
@@ -2663,3 +2706,8 @@ if __name__ == "__main__":
 
     # Test bert model
     test_forward_pretrained_bert_base_uncased()
+    """
+
+    #test_forward_roi_align()
+    #test_forward_index()
+    test_forward_

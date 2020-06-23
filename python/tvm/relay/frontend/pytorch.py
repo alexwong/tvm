@@ -1733,6 +1733,8 @@ def _roi_align():
     def _impl(inputs, input_types):
         print('in roi allign')
         print(inputs)
+
+        return _op.vision.rcnn.roi_align(inputs[0], inputs[1], (inputs[3], inputs[4]), inputs[2], inputs[4])
     return _impl
 
 
@@ -1872,6 +1874,7 @@ def _get_convert_map(prelude):
         "aten::softmax"                         : _softmax(),
         "aten::threshold"                       : _threshold(),
         "aten::threshold_"                      : _threshold(),
+        "aten::threshold_"                      : _threshold(),
         "aten::contiguous"                      : _contiguous(),
         "aten::batch_norm"                      : _batch_norm(),
         "aten::instance_norm"                   : _instance_norm(),
@@ -1978,6 +1981,15 @@ def _get_convert_map(prelude):
         "aten::len"                             : _list_len(prelude),
         "aten::type_as"                         : _type_as(),
         "torchvision::roi_align"                : _roi_align(),
+        #"aten::__and__"                         : _elemwise("and"),
+        #"aten::index"                           : _index(),
+        #"aten::copy_"                           : _copy(),
+        #"aten::ScalarImplicit"                  : _ScalarImplicit(),
+        #"aten::index_put_"                      : _index_put(),
+        #"aten::nonzero"                         : _nonzero(),
+        #"aten::clamp_"                          : _clamp()
+        #"torchvision::nms"                      : _nms()
+        #"aten::log2"                            : _log2()
     }
     return convert_map
 
@@ -2047,6 +2059,21 @@ def _report_missing_conversion(op_names, convert_map):
         msg = "The following operators are not implemented: {}".format(missing)
         raise NotImplementedError(msg)
 
+
+def _check_if_missing_conversion(op_name, convert_map):
+    """ Check if all ops in an input graph are supported by TVM """
+    known_ops = ["prim::Constant", "prim::GetAttr",
+                 "prim::ListConstruct", "prim::ListUnpack",
+                 "prim::TupleConstruct", "prim::TupleUnpack",
+                 "prim::If", "prim::Loop"]
+    known_ops += list(convert_map.keys())
+    known_ops += list(qnn_torch.convert_map.keys())
+
+    print('check operator')
+    print(op_name)
+
+    if op_name not in known_ops:
+        print("This operator is not implemented: {}".format(op_name))
 
 def _check_inputs(graph, input_shapes):
     """
@@ -2436,6 +2463,14 @@ def convert_operators(operators, outputs, ret_names, convert_map, prelude):
     """ Convert each Torch IR operators to Relay equivalent """
     for node_name, op_node in operators:
         operator = op_node.kind()
+
+        print('iterate ops')
+        print(node_name)
+        print(op_node)
+        print(operator)
+
+        _check_if_missing_conversion(operator, convert_map)
+
         inputs = _get_op_inputs(op_node, outputs)
 
         if operator == "prim::Constant":
@@ -2528,6 +2563,17 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None):
     graph = script_module.graph.copy()
     _run_jit_passes(graph)
 
+
+    print('ts graph')
+    print(graph)
+    print('ts graph end')
+
+    print('ts nodes')
+    for node in graph.nodes():
+        print(node)
+    print('ts nodes end')
+
+
     if custom_convert_map:
         convert_map.update(custom_convert_map)
 
@@ -2555,6 +2601,8 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None):
 
     ret = convert_operators(_get_operator_nodes(graph.nodes()),
                             outputs, ret_name, convert_map, prelude)
+
+    print('converted all ops')
 
     mod["main"] = tvm.relay.Function(_analysis.free_vars(ret[0]), ret[0])
 
