@@ -2429,14 +2429,24 @@ def test_forward_copy():
 
     class Copy1(Module):
         def forward(self, *args):
-            tensor = args[0]
-            index = args[1]
-            return tensor[index]
+            tensor1 = args[0].clone()
+            return tensor1
 
-    tensor1 = torch.randn(10)
-    index = 1
-    verify_model(Index1().float().eval(), input_data=[tensor1, index])
+    tensor = torch.randn(10)
+    verify_model(Copy1().float().eval(), input_data=[tensor])
 
+
+def test_forward_scalar_implicit():
+    torch.set_grad_enabled(False)
+
+    class ScalarImplicit1(Module):
+        def forward(self, *args):
+            tensor1 = args[0]
+            tensor2 = args[0].copy()
+            return tensor2
+
+    tensor = torch.randn(10)
+    verify_model(ScalarImplicit1().float().eval(), input_data=[tensor])
 
 
 def test_forward_pretrained_bert_base_uncased():
@@ -2710,4 +2720,5 @@ if __name__ == "__main__":
 
     #test_forward_roi_align()
     #test_forward_index()
-    test_forward_
+    #test_forward_copy()
+    test_forward_scalar_implicit()

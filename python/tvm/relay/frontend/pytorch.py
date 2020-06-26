@@ -127,6 +127,12 @@ def _is_quantized_tensor(data, prelude):
 def _elemwise(name):
     def _impl(inputs, input_types):
         # TODO: Figure out a better way to get typing to work for tensor + scalar
+
+        print('here we go again')
+        print('in elemwise '+name)
+        print(inputs)
+        print(input_types)
+
         type0 = input_types[0]
         if isinstance(inputs[1], _expr.Expr):
             type0 = input_types[1]
@@ -137,6 +143,15 @@ def _elemwise(name):
 
         data0 = _convert_elemwise_input(inputs[0], type0)
         data1 = _convert_elemwise_input(inputs[1], type1)
+
+        print('inputs to elemwise '+name)
+        print(data0)
+        print(type(data0))
+        print(_infer_type(data0).checked_type)
+        print('second')
+        print(data1)
+        print(type(data1))
+        print(_infer_type(data1).checked_type)
 
         return get_relay_op(name)(data0, data1)
     return _impl
@@ -168,9 +183,22 @@ def _arange():
 
         def _get_type(val, inp_type):
             if isinstance(val, _expr.Expr):
+
+                print('in gettype arange')
+                print(val)
+                print(inp_type)
+
                 dtype = str(_infer_type(val).checked_type)
                 return dtype if dtype != "float32" else "float"
             return inp_type
+
+        print('in arange impl')
+        print(inputs)
+        print(input_types)
+
+        print('in0')
+        print(inputs[0])
+        print(input_types[0])
 
         if len(inputs) == 5:
             dtype0 = _get_type(inputs[0], input_types[0])
@@ -1038,6 +1066,13 @@ def _size(prelude):
 
 def _numtotensor():
     def _impl(inputs, input_types):
+
+        print('in numtotensor')
+        print(inputs)
+        print(inputs[0])
+        print(input_types)
+        print(input_types[0])
+
         val = inputs[0]
         dtype = input_types[0]
 
@@ -1048,6 +1083,9 @@ def _numtotensor():
             val = val.__int__()
             dtype = int
 
+        print('numtotensor dtype')
+        print(dtype)
+
         arr = val * np.ones([]).astype(dtype)
         return arr
     return _impl
@@ -1055,6 +1093,11 @@ def _numtotensor():
 
 def _tensortonum():
     def _impl(inputs, input_types):
+
+        print('in tensortonum')
+        print(inputs)
+        print(inputs[0])
+
         return inputs[0]
     return _impl
 
@@ -1738,6 +1781,14 @@ def _roi_align():
     return _impl
 
 
+def _ScalarImplicit():
+    def _impl(inputs, input_types):
+        print('in scalar implicit')
+        print(inputs)
+
+        return
+    return _impl
+
 # Helper functions for operator implementation
 def _convert_dtype_value(val):
     convert_torch_dtype_map = {7:"torch.float64",
@@ -1750,6 +1801,11 @@ def _convert_dtype_value(val):
                                0:"torch.unit8",
                                None:"torch.int64"} # Default is torch.int64
     if val in convert_torch_dtype_map:
+
+        print('dtype conversion?')
+        print(val)
+        print(convert_torch_dtype_map[val])
+
         return convert_torch_dtype_map[val]
     else:
         msg = "Torch data type value %d is not handled yet." % (val)
@@ -1801,11 +1857,27 @@ def _create_typed_const(data, data_type):
 
 def _convert_elemwise_input(data, input_type):
     import torch
+
+    print('in convert_elemwise_input')
+    print(data)
+    print(input_type)
+
     if isinstance(data, torch.Tensor):
+        print('is torchtensor')
         return _expr.const(data.item(), dtype=_convert_data_type(input_type))
     elif not isinstance(data, _expr.Expr):
-        return _expr.const(data, dtype=_convert_data_type(input_type))
+        print('isnot expr')
+        d_type = _convert_data_type(input_type)
+        print(d_type)
+
+        print(type(data))
+        if isinstance(data, np.int64) and d_type=='float32':
+            print('in here')
+            data = data.astype(d_type)
+
+        return _expr.const(data, dtype=d_type)
     else:
+        print('else')
         return data
 
 def _wrap_const(c):
@@ -1983,8 +2055,7 @@ def _get_convert_map(prelude):
         "torchvision::roi_align"                : _roi_align(),
         #"aten::__and__"                         : _elemwise("and"),
         #"aten::index"                           : _index(),
-        #"aten::copy_"                           : _copy(),
-        #"aten::ScalarImplicit"                  : _ScalarImplicit(),
+        #"aten::copy_"                           : _clone(),
         #"aten::index_put_"                      : _index_put(),
         #"aten::nonzero"                         : _nonzero(),
         #"aten::clamp_"                          : _clamp()
