@@ -51,6 +51,11 @@ def _infer_type_with_prelude(val, prelude):
 
 def _convert_to_list_adt(py_lst, prelude):
     elem_tys = [_infer_type_with_prelude(elem, prelude) for elem in py_lst]
+
+    print('elem types')
+    for elem_ty in elem_tys:
+        print(elem_ty)
+
     msg = "List elements should have identical types"
     assert all(map(lambda ty: ty == elem_tys[0], elem_tys)), msg
 
@@ -538,10 +543,12 @@ def _linspace():
 def _relu(prelude):
     def _impl(inputs, input_types):
         data = inputs[0]
+        """
         if _is_quantized_tensor(data, prelude):
             assert len(inputs) == 3, "Input quant param not found in op inputs"
             input_zero_point = _expr.const(inputs[2], dtype="int32")
             return qnn_torch.quantized_relu(data, input_zero_point)
+        """
         return _op.nn.relu(data)
     return _impl
 
@@ -1024,6 +1031,10 @@ def _size(prelude):
         return shape_dynamic
 
     def _impl(inputs, input_types):
+        print('in size impl')
+        #print(inputs)
+        print('input0 in size impl')
+        print(inputs[0])
         shape = _infer_shape(inputs[0], prelude.mod)
         axis = None
         if len(inputs) > 1:
@@ -2507,6 +2518,11 @@ def convert_operators(operators, outputs, ret_names, convert_map, prelude, defau
         operator = op_node.kind()
         inputs = _get_op_inputs(op_node, outputs)
 
+        print('iterate ops')
+        print(node_name)
+        print(op_node)
+        print(operator)
+
         if operator == "prim::Constant":
             outputs[node_name] = _get_constant(op_node)
         elif operator == "prim::ListConstruct" and _is_int_seq(inputs):
@@ -2523,6 +2539,9 @@ def convert_operators(operators, outputs, ret_names, convert_map, prelude, defau
             assert len(inputs) == 1
             if isinstance(inputs[0], (list, _expr.TupleWrapper)):
                 unpacked = inputs[0]
+                print('shuld be here')
+                print(unpacked)
+                print(type(unpacked))
             else:
                 unpacked = _unpack_tuple(inputs[0])
             outputs.update(zip(_get_output_names(op_node), unpacked))
@@ -2599,11 +2618,20 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None, default_d
     graph = script_module.graph.copy()
     _run_jit_passes(graph)
 
+    print('ts graph')
+    print(graph)
+    print('ts graph end')
+
+    print('ts nodes')
+    for node in graph.nodes():
+        print(node)
+    print('ts nodes end')
+
     if custom_convert_map:
         convert_map.update(custom_convert_map)
 
     op_names = get_all_op_names(graph)
-    _report_missing_conversion(op_names, convert_map)
+    #_report_missing_conversion(op_names, convert_map)
 
     is_module = isinstance(script_module, torch.jit.ScriptModule)
     params = script_module.state_dict() if is_module else {}
