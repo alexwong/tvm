@@ -1733,6 +1733,73 @@ def _meshgrid():
         return _op.meshgrid(data)
     return _impl
 
+
+"""
+def _nms():
+    def _impl(inputs, input_types):
+        print('in impl')
+
+    return _impl
+"""
+
+
+def _logical_and():
+    def _impl(inputs, input_types):
+        print('in logical and')
+        lhs = _op.cast(inputs[0], "bool")
+        rhs = _op.cast(inputs[1], "bool")
+
+        return _op.logical_and(lhs, rhs)
+    return _impl
+
+
+def _nonzero():
+    def _impl(inputs, input_types):
+        print('in nonzero impl')
+        data = inputs[0]
+
+        return _op.transform.argwhere(data)
+    return _impl
+
+
+def _nms():
+    def _impl(inputs, input_types):
+        print('in impl')
+        #max_output_size = int(np.atleast_1d(inputs[2].data.asnumpy()
+        #                                    .astype("int64"))[0])
+
+        boxes = inputs[0]
+        scores = inputs[1]
+        iou_threshold = inputs[2]
+
+        # Generate data with shape (1, num_anchors, 5)
+        from .common import AttrCvt, get_relay_op
+        """
+        scores = AttrCvt(op_name="expand_dims",
+                         ignores=['T_threshold'],
+                         extras={'axis': -1, 'num_newaxis': 1})([scores], attr)
+        """
+        data = _op.concatenate([scores, boxes], -1)
+        data = _op.expand_dims(data, 0, 1)
+
+        ct, data, indices = get_relay_op('get_valid_counts')(data,
+                                                     score_threshold=float('-inf'),
+                                                     id_index=-1,
+                                                     score_index=0)
+
+        print(ct)
+        print(data)
+        print(indices)
+
+        nms_ret = get_relay_op('non_max_suppression')(data=data,
+                                                      valid_count=ct,
+                                                      indices=indices,
+                                                      iou_threshold=iou_threshold,
+                                                      )
+
+        return nms_ret
+    return _impl
+
 def _pytorch_result_type(dtypes, non_tensor_inputs):
     """This promotes TVM dtypes like PyTorch would"""
     import torch
@@ -2034,6 +2101,9 @@ def _get_convert_map(prelude):
         "aten::len"                             : _list_len(prelude),
         "aten::type_as"                         : _type_as(),
         "aten::index"                           : _list_getitem(prelude),
+        "aten::__and__"                         : _logical_and(),
+        "aten::nonzero"                         : _nonzero(),
+        "torchvision::nms"                      : _nms(),
     }
     return convert_map
 
@@ -2517,6 +2587,11 @@ def convert_operators(operators, outputs, ret_names, convert_map, prelude, defau
     for node_name, op_node in operators:
         operator = op_node.kind()
         inputs = _get_op_inputs(op_node, outputs)
+
+        print('in covert')
+        print(node_name)
+        print(operator)
+        print(op_node)
 
         if operator == "prim::Constant":
             outputs[node_name] = _get_constant(op_node)
