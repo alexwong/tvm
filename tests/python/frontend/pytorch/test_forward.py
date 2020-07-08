@@ -213,6 +213,40 @@ def verify_model(model_name, input_data=[],
     del baseline_model
     torch.cuda.empty_cache()
 
+
+def get_trace(model_name, input_data=[],
+                 custom_convert_map={},
+                 ctx_list=ctx_list(),
+                 rtol=1e-5, atol=1e-5):
+    """Assert that the output of a compiled model matches with that of its
+    baseline."""
+    if isinstance(model_name, str):
+        baseline_model, baseline_input = load_model(model_name)
+    elif isinstance(input_data, list):
+        baseline_model = model_name
+        baseline_input = input_data
+    elif isinstance(input_data, torch.Tensor) or len(input_data.shape) == 0:
+        baseline_model = model_name
+        baseline_input = [input_data]
+    else:
+        assert False, "Unexpected input format"
+
+    if torch.cuda.is_available():
+        if isinstance(baseline_model, torch.nn.Module):
+            baseline_model = baseline_model.cuda()
+        baseline_input = [inp.cuda() for inp in baseline_input]
+
+    with torch.no_grad():
+        baseline_outputs = baseline_model(*baseline_input)
+
+    if isinstance(baseline_outputs, tuple):
+        baseline_outputs = tuple(out.cpu().numpy() for out in baseline_outputs)
+    else:
+        baseline_outputs = (baseline_outputs.cpu().numpy(),)
+
+    trace = torch.jit.trace(baseline_model, baseline_input)
+    return trace
+
 # Single operator tests
 def test_forward_add():
     torch.set_grad_enabled(False)
@@ -1555,6 +1589,36 @@ def verify_script_model(pt_model, ishapes):
         tvm.testing.assert_allclose(op_res.asnumpy(), pt_result.numpy(),
                                     rtol=1e-5, atol=1e-5)
 
+def verify_trace_model(pt_model, trace, ishapes):
+    script_module = trace
+
+    input_names = ["i{}".format(idx) for idx, ish in enumerate(ishapes)]
+    input_shapes = list(zip(input_names, ishapes))
+
+    inputs = [torch.randn(shape, dtype=torch.float)
+              for shape in ishapes]
+
+    mod, params = relay.frontend.from_pytorch(script_module, input_shapes)
+
+    executor = relay.create_executor("vm", mod=mod, ctx=tvm.cpu(0),
+                                     target="llvm")
+    evaluator = executor.evaluate()
+
+    for name, inp in zip(input_names, inputs):
+        params[name] = inp.numpy()
+
+    op_res = evaluator(**params)
+
+    with torch.no_grad():
+        pt_result = pt_model(*inputs)
+
+    if not isinstance(pt_result, torch.Tensor):
+        tvm_res = op_res.asnumpy().item()
+        assert pt_result == tvm_res
+    else:
+        tvm.testing.assert_allclose(op_res.asnumpy(), pt_result.numpy(),
+                                    rtol=1e-5, atol=1e-5)
+
 
 def test_control_flow():
     class SimpleIf(torch.nn.Module):
@@ -2549,10 +2613,33 @@ def test_forward_nms():
             from torchvision.ops import nms
             return nms(args[0], args[1], 0.7)
 
-    boxes = torch.randn(5, 4)
-    scores = torch.randn(5)
+    class Nms2(Module):
+        def forward(self, *args):
+            from torchvision.ops import nms
+            return nms(args[0], args[1], 0.5)
 
-    verify_model(Nms1().float().eval(), input_data = [boxes, scores])
+    class Nms3(Module):
+        def forward(self, *args):
+            from torchvision.ops import nms
+            return nms(args[0], args[1], 0.3)
+
+    boxes1 = torch.randn(5, 4)
+    scores1 = torch.randn(5)
+
+    trace = get_trace(Nms1().float().eval(), [boxes1, scores1])
+    verify_trace_model(Nms1().float().eval(), trace, [boxes1.shape, scores1.shape])
+
+    boxes2 = torch.randn(20, 4)
+    scores2 = torch.randn(20)
+
+    trace = get_trace(Nms2().float().eval(), [boxes2, scores2])
+    verify_trace_model(Nms2().float().eval(), trace, [boxes2.shape, scores2.shape])
+
+    boxes3 = torch.randn(40, 4)
+    scores3 = torch.randn(40)
+
+    trace = get_trace(Nms3().float().eval(), [boxes3, scores3])
+    verify_trace_model(Nms3().float().eval(), trace, [boxes3.shape, scores3.shape])
 
 
 def test_forward_pretrained_bert_base_uncased():

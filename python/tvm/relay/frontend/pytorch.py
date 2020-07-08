@@ -248,20 +248,28 @@ def _concatenate(prelude):
 
 def _slice(prelude):
     def _impl(inputs, input_types):
+
+        print('in slice impl')
         data = inputs[0]
         strides = []
 
         if isinstance(data, _expr.Expr):
+            print('inferring shape of data')
             inferred_shape = _infer_shape(data, prelude.mod)
+            print('sd')
             end = []
             for infer in inferred_shape:
+                print('asd')
                 end.append(int(infer))
+            print('asfda')
             if isinstance(data, _expr.Var):
+                print('adsd')
                 end = inferred_shape
                 end = list(end)
         else:
             end = data.shape
 
+        print('here')
         begin = [0] * len(end)
         dim = int(inputs[1])
         if isinstance(inputs[2], _expr.Call):
@@ -278,6 +286,7 @@ def _slice(prelude):
                 end[dim] = inputs[3]
 
         strides.append(int(inputs[4]))
+        print('slice call')
         return _op.transform.strided_slice(data,
                                            begin=_expr.const(begin),
                                            end=_expr.const(end),
@@ -1648,6 +1657,11 @@ def _logical_xor():
 
 def _list_getitem(prelude):
     def _impl(inputs, input_types):
+
+        print('in list_getitem')
+        print(inputs[0])
+        print(inputs[1])
+
         return prelude.nth(inputs[0], _wrap_const(inputs[1]))
     return _impl
 
@@ -1782,32 +1796,96 @@ def _nms():
         scores = inputs[1]
         iou_threshold = inputs[2]
 
+        print('check some ins box')
+        print(boxes)
+        print(type(boxes))
+
+
+        print('check some ins scores')
+        print(scores)
+        print(type(scores))
+
+        print('check some ins iou')
+        print(iou_threshold)
+        print(type(iou_threshold))
+        #iou_threshold = np.atleast_1d(inputs[2].data.asnumpy())[0]
+
         # Generate data with shape (1, num_anchors, 5)
         from .common import AttrCvt, get_relay_op
-        """
+
+        #scores = AttrCvt(op_name="expand_dims",
+        #                 ignores=['T_threshold'],
+        #                 extras={'axis': -1, 'num_newaxis': 1})([scores], {})
+
+        #def expand_dims(data, axis, num_newaxis=1)
+
+        print('data stuff')
+        print(scores)
+        print(type(scores))
+
+        #scores = _op.transform.expand_dims(scores, -1, 1)
+
         scores = AttrCvt(op_name="expand_dims",
-                         ignores=['T_threshold'],
-                         extras={'axis': -1, 'num_newaxis': 1})([scores], attr)
-        """
+                         extras={'axis': -1, 'num_newaxis': 1})([scores], {})
+
         data = _op.concatenate([scores, boxes], -1)
         data = _op.expand_dims(data, 0, 1)
 
         ct, data, indices = get_relay_op('get_valid_counts')(data,
-                                                     score_threshold=float('-inf'),
+                                                     #score_threshold=float('-inf'),
+                                                     score_threshold=float('-100'),
                                                      id_index=-1,
                                                      score_index=0)
 
+        print('prep nms')
+        print('prep nms')
+        print('ct')
         print(ct)
+        print('data')
         print(data)
+        print('indices')
         print(indices)
 
+        print('what')
+
+        # PyTorch NMS doesn't have parameter top_k
+        top_k = -1
+        # PyTorch doesn't have class id for nms input
+        score_index = 0
+        max_output_size = -1
+        print('nms call')
         nms_ret = get_relay_op('non_max_suppression')(data=data,
                                                       valid_count=ct,
                                                       indices=indices,
+                                                      max_output_size=max_output_size,
                                                       iou_threshold=iou_threshold,
-                                                      )
+                                                      force_suppress=True,
+                                                      top_k=top_k,
+                                                      coord_start=1,
+                                                      score_index=score_index,
+                                                      id_index=-1,
+                                                      return_indices=True,
+                                                      invalid_to_bottom=False)
 
-        return nms_ret
+        print('out of nms call')
+        print(type(nms_ret))
+
+        # squeeze it, TF NMS is not batched
+        size = get_relay_op("squeeze")(nms_ret[1], axis=[1])
+        print('size out')
+        print(size)
+
+        data_slice = get_relay_op("squeeze")(nms_ret[0], axis=[0])
+        print('data slice out')
+        print(data_slice)
+
+        # slice to get the dynamic result
+        # not sure if we should have this slice
+        ret = get_relay_op("strided_slice")(data_slice, begin=_expr.const([0]),
+                                            end=size, slice_mode="size")
+        #input("dummy breakpoint")
+        return ret
+        #return data_slice
     return _impl
 
 def _pytorch_result_type(dtypes, non_tensor_inputs):
@@ -2697,6 +2775,9 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None, default_d
 
     graph = script_module.graph.copy()
     _run_jit_passes(graph)
+
+    print('torch graph')
+    print(graph)
 
     if custom_convert_map:
         convert_map.update(custom_convert_map)
