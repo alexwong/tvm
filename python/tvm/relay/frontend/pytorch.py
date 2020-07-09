@@ -1662,7 +1662,29 @@ def _list_getitem(prelude):
         print(inputs[0])
         print(inputs[1])
 
-        return prelude.nth(inputs[0], _wrap_const(inputs[1]))
+        input("a1")
+        print('check inputs to get val count')
+        #t3 = _infer_type(data).checked_type
+        t3 = _infer_type_with_prelude(inputs[0], prelude)
+        print(t3)
+        input("a1a")
+        s3 = _infer_shape(inputs[0], prelude.mod)
+        print(s3)
+        input("a1aa")
+
+        temp = prelude.nth(inputs[0], _wrap_const(inputs[1]))
+
+        input("b1")
+        print('check inputs to get val count')
+        #t3 = _infer_type(data).checked_type
+        t3 = _infer_type_with_prelude(temp, prelude)
+        print(t3)
+        input("b1b")
+        s3 = _infer_shape(temp, prelude.mod)
+        print(s3)
+        input("b1bb")
+
+        return temp
     return _impl
 
 
@@ -1758,15 +1780,6 @@ def _meshgrid():
     return _impl
 
 
-"""
-def _nms():
-    def _impl(inputs, input_types):
-        print('in impl')
-
-    return _impl
-"""
-
-
 def _logical_and():
     def _impl(inputs, input_types):
         print('in logical and')
@@ -1786,7 +1799,7 @@ def _nonzero():
     return _impl
 
 
-def _nms():
+def _nms(prelude):
     def _impl(inputs, input_types):
         print('in impl')
         #max_output_size = int(np.atleast_1d(inputs[2].data.asnumpy()
@@ -1828,8 +1841,37 @@ def _nms():
         scores = AttrCvt(op_name="expand_dims",
                          extras={'axis': -1, 'num_newaxis': 1})([scores], {})
 
+        #See if these inputs are fucked
+        #print('checking input infer stuff')
+        input("a00")
+        #t1 = _infer_type(scores).check_type
+        #print('t1')
+        t1 = _infer_type_with_prelude(scores, prelude)
+        print(t1)
+        input("a00a")
+        #print('s1')
+        #s1 = _infer_shape(scores, prelude.mod)
+        #print(s1)
+        input('a001')
+        #t2= _infer_type(boxes).checked_type
+        t2 = _infer_type_with_prelude(boxes, prelude)
+        print(t2)
+        input('a001a')
+        #s2 = _infer_shape(boxes, prelude.mod)
+        #print(s2)
+
         data = _op.concatenate([scores, boxes], -1)
         data = _op.expand_dims(data, 0, 1)
+
+        #Seew if concat data is messed up
+        input("a0")
+        print('check inputs to get val count')
+        #t3 = _infer_type(data).checked_type
+        t3 = _infer_type_with_prelude(data, prelude)
+        print(t3)
+        s3 = _infer_shape(data, prelude.mod)
+        print(s3)
+        input("a0a")
 
         ct, data, indices = get_relay_op('get_valid_counts')(data,
                                                      #score_threshold=float('-inf'),
@@ -1883,7 +1925,7 @@ def _nms():
         # not sure if we should have this slice
         ret = get_relay_op("strided_slice")(data_slice, begin=_expr.const([0]),
                                             end=size, slice_mode="size")
-        #input("dummy breakpoint")
+        input("dummy breakpoint")
         return ret
         #return data_slice
     return _impl
@@ -2192,7 +2234,7 @@ def _get_convert_map(prelude):
         "aten::index"                           : _list_getitem(prelude),
         "aten::__and__"                         : _logical_and(),
         "aten::nonzero"                         : _nonzero(),
-        "torchvision::nms"                      : _nms(),
+        "torchvision::nms"                      : _nms(prelude),
     }
     return convert_map
 
