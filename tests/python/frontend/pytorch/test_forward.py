@@ -1564,6 +1564,8 @@ def verify_trace_model(pt_model, trace, ishapes):
 
     with torch.no_grad():
         pt_result = pt_model(*inputs)
+        print('pt result')
+        print(pt_result)
 
     if not isinstance(pt_result, torch.Tensor):
         tvm_res = op_res.asnumpy().item()
@@ -2582,6 +2584,7 @@ def test_forward_nms():
     trace = get_trace(Nms1().float().eval(), [boxes1, scores1])
     verify_trace_model(Nms1().float().eval(), trace, [boxes1.shape, scores1.shape])
 
+    """
     boxes2 = torch.randn(20, 4)
     scores2 = torch.randn(20)
 
@@ -2593,6 +2596,62 @@ def test_forward_nms():
 
     trace = get_trace(Nms3().float().eval(), [boxes3, scores3])
     verify_trace_model(Nms3().float().eval(), trace, [boxes3.shape, scores3.shape])
+    """
+
+def test_forward_roi_align():
+    torch.set_grad_enabled(False)
+
+    class RoiAlign1(Module):
+        def forward(self, *args):
+            from torchvision.ops import roi_align
+            return roi_align(args[0], args[1], (7,7))
+
+    class RoiAlign2(Module):
+        def forward(self, *args):
+            from torchvision.ops import roi_align
+            return roi_align(args[0], [args[1]], (3, 3))
+
+    """
+    data1 = torch.randn(1, 4, 16, 16)
+    boxes1 = [torch.rand(1,4) for i in range(32)]
+
+    print(boxes1)
+    for b in boxes1:
+        print('checking')
+        print(b.size(0))
+        print(b.size(1))
+    input('check box')
+    osize1 = [7,7]
+
+    #trace = get_trace(RoiAlign1().float().eval(), [data1, boxes1])
+    #verify_trace_model(RoiAlign1().float().eval(), trace, [data1.shape, len(boxes1)])
+    """
+
+    boxes = torch.rand(10, 4) * 100
+    boxes[:, 2:] += boxes[:, :2]
+    image = torch.rand(1, 3, 200, 200)
+
+    trace = get_trace(RoiAlign2().float().eval(), [image, boxes])
+    verify_trace_model(RoiAlign2().float().eval(), trace, [image.shape, boxes.shape])
+
+def test_rando():
+    torch.set_grad_enabled(False)
+
+    class test(Module):
+        def forward(self, *args):
+            list = []
+            list.append(args[0])
+            list.append(args[1])
+            list.append(args[2])
+
+    data = torch.randn(2,2)
+    verify_model(test().float().eval(), input_data=[data, data, data])
+
+def test_fasterrcnn():
+    torch.set_grad_enabled(False)
+    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
+    x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
+    verify_trace_model(torchvision.models.detection.FasterRCNNmodel, model, [(3, 300, 400), (3, 500, 400)])
 
 
 def test_forward_pretrained_bert_base_uncased():
@@ -2872,4 +2931,8 @@ if __name__ == "__main__":
     test_forward_pretrained_bert_base_uncased()
     """
 
-    test_forward_nms()
+    #test_forward_nms()
+    test_forward_roi_align()
+    #test_fasterrcnn()
+
+    #test_rando()
