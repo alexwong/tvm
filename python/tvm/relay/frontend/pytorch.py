@@ -101,15 +101,26 @@ def _should_construct_dynamic_list(list_construct_node):
         list_loop_var = list(block.inputs())[block_input_index]
         uses += _get_uses(list_loop_var.node())
 
+    print('uses')
+    for use in uses:
+        print('user')
+        print(use.user)
+
     op_names = map(inplace_add_to_add, set(use.user.kind() for use in uses))
 
-    list_ops = set(["aten::add", "aten::__getitem__", "aten::stack", "aten::index"])
+    list_ops = set(["aten::add", "aten::__getitem__", "aten::stack"])
     intersect = list_ops.intersection(op_names)
 
+    print('in check for dynamic list')
+    print(intersect)
+
+    #Why is this returning true
     if len(intersect) > 0 and intersect != set(["aten::add"]):
+        print('returned 1')
         return True
 
     if is_used_by_list_add(filter(lambda use: use.user.kind() != "prim::Loop", uses)):
+        print('eturned 2')
         return True
 
     return False
@@ -245,8 +256,50 @@ def _concatenate(prelude):
 
         return _op.tensor.concatenate(data, int(axis))
     return _impl
+"""
+def _size(prelude):
+    def _impl_dynamic(inp, axis):
+        shape_dynamic = _op.shape_of(inp)
+        if axis is not None:
+            return _op.take(shape_dynamic, _expr.const(axis), 0)
+        return shape_dynamic
 
+    def _impl(inputs, input_types):
+        shape = _infer_shape(inputs[0], prelude.mod)
+        axis = None
+        if len(inputs) > 1:
+            axis = int(inputs[1])
+
+        if any(map(lambda s: isinstance(s, tvm.tir.expr.Any), shape)):
+            if axis is None or isinstance(shape[axis], tvm.tir.expr.Any):
+                return _impl_dynamic(inputs[0], axis)
+
+        if axis is not None:
+            return shape[axis]
+        return shape
+    return _impl
+"""
 def _slice(prelude):
+
+    def _impl_dynamic(data, begin, end, strides, input_types):
+        #input('check here')
+        print('in dynamic slice')
+
+        print('b')
+        print(begin)
+        print('e')
+        print(end)
+        print('s')
+        print(strides)
+
+        #end = _expr.var('end', shape=Any(), dtype='int32')
+
+        return _op.transform.strided_slice(data,
+                                           begin=begin,
+                                           end=_expr.const([-1], dtype='int32'),
+                                           strides=strides,
+                                           slice_mode="size")
+
     def _impl(inputs, input_types):
 
         print('in slice impl')
@@ -258,16 +311,24 @@ def _slice(prelude):
             inferred_shape = _infer_shape(data, prelude.mod)
             print('sd')
             end = []
+            print(inferred_shape)
+            #input('in slice infer shape')
             for infer in inferred_shape:
-                print('asd')
-                end.append(int(infer))
+                print('in slice infer shape')
+                print(infer)
+                print(type(infer))
+                end.append(infer)
             print('asfda')
             if isinstance(data, _expr.Var):
                 print('adsd')
                 end = inferred_shape
                 end = list(end)
         else:
+            print('just get shape bruh')
             end = data.shape
+
+        print(end)
+        print(type(end))
 
         print('here')
         begin = [0] * len(end)
@@ -285,8 +346,17 @@ def _slice(prelude):
             else:
                 end[dim] = inputs[3]
 
+        print('new end')
+        print(end)
+        print(type(end))
+
         strides.append(int(inputs[4]))
         print('slice call')
+
+        if any(map(lambda s: isinstance(s, tvm.tir.expr.Any), end)):
+            print('got an any in new end')
+            return _impl_dynamic(data, begin, end, strides, input_types)
+
         return _op.transform.strided_slice(data,
                                            begin=_expr.const(begin),
                                            end=_expr.const(end),
@@ -324,12 +394,35 @@ def _split_with_sizes():
         return _op.split(data, indices, dim)
     return _impl
 
-def _select():
+def _select(prelude):
     def _impl(inputs, input_types):
         data = inputs[0]
         dim = int(inputs[1])
         index = _wrap_const(inputs[2])
-        return _op.transform.take(data, index, axis=dim)
+
+        #input("d1")
+        #print('check inputs to select')
+        #t3 = _infer_type(data).checked_type
+        #t3 = _infer_type_with_prelude(data, prelude)
+        #print(t3)
+        #input("d1d")
+        #s3 = _infer_shape(temp, prelude.mod)
+        #print(s3)
+        #input("d1dd")
+
+        temp = _op.transform.take(data, index, axis=dim)
+
+        #input("dd1")
+        #print('check inputs to select')
+        #t3 = _infer_type(temp).checked_type
+        #t3 = _infer_type_with_prelude(temp, prelude)
+        #print(t3)
+        #input("dd1d")
+        #s3 = _infer_shape(temp, prelude.mod)
+        #print(s3)
+        #input("d1dd")
+        
+        return temp
     return _impl
 
 def _take():
@@ -337,13 +430,35 @@ def _take():
         data = inputs[0]
         indices = _op.cast(inputs[1], "int32")
 
-        return _op.transform.take(data, indices=indices)
+        input("c1")
+        print('check inputs to take')
+        t3 = _infer_type(data).checked_type
+        #t3 = _infer_type_with_prelude(temp, prelude)
+        print(t3)
+        input("c1c")
+        #s3 = _infer_shape(temp, prelude.mod)
+        #print(s3)
+        #input("c1cc")
+
+        temp = _op.transform.take(data, indices=indices)
+
+        input("cc1")
+        print('check inputs to take')
+        t3 = _infer_type(temp).checked_type
+        #t3 = _infer_type_with_prelude(temp, prelude)
+        print(t3)
+        input("cc1c")
+        #s3 = _infer_shape(temp, prelude.mod)
+        #print(s3)
+        #input("c1cc")
+
+        return temp
     return _impl
 
 def _topk():
     def _impl(inputs, input_types):
         data = inputs[0]
-        k = int(inputs[1])
+        k = inputs[1]
         axis = int(inputs[2])
         is_ascend = not bool(inputs[3])
         sort = bool(inputs[4])
@@ -1658,12 +1773,17 @@ def _logical_xor():
 def _list_getitem(prelude):
     def _impl(inputs, input_types):
 
+
         print('in list_getitem')
         print(inputs[0])
         print(inputs[1])
+        print(type(inputs[0]))
+        print(type(inputs[1]))
+        #input('getitem impl inputs and types')
 
+        """
         input("a1")
-        print('check inputs to get val count')
+        print('check inputs to list get')
         #t3 = _infer_type(data).checked_type
         t3 = _infer_type_with_prelude(inputs[0], prelude)
         print(t3)
@@ -1671,18 +1791,34 @@ def _list_getitem(prelude):
         s3 = _infer_shape(inputs[0], prelude.mod)
         print(s3)
         input("a1aa")
+        """
+
+        """
+        #This is where it gets screwed
+        input("b1")
+        print('check inputs to list get')
+        #t3 = _infer_type(data).checked_type
+        t3 = _infer_type_with_prelude(inputs[1], prelude)
+        print(t3)
+        input("b1b")
+        s3 = _infer_shape(inputs[1], prelude.mod)
+        print(s3)
+        input("b1bb")
+        """
 
         temp = prelude.nth(inputs[0], _wrap_const(inputs[1]))
 
-        input("b1")
-        print('check inputs to get val count')
+        """
+        input("c1")
+        print('check inputs to list get')
         #t3 = _infer_type(data).checked_type
         t3 = _infer_type_with_prelude(temp, prelude)
         print(t3)
-        input("b1b")
+        input("c1c")
         s3 = _infer_shape(temp, prelude.mod)
         print(s3)
-        input("b1bb")
+        input("c1cc")
+        """
 
         return temp
     return _impl
@@ -1790,18 +1926,34 @@ def _logical_and():
     return _impl
 
 
-def _nonzero():
+def _nonzero(prelude):
     def _impl(inputs, input_types):
         print('in nonzero impl')
         data = inputs[0]
+        #print(data)
+        #input('nonzero/argwhere')
 
-        return _op.transform.argwhere(data)
+        #input('typecheck')
+        #t = _infer_type_with_prelude(data, prelude)
+        #print(t)
+        #print(t.checked_type)
+        #input('typechecked')
+
+        temp = _op.transform.argwhere(data)
+
+        #input('typecheck1')
+        #t = _infer_type_with_prelude(temp, prelude)
+        #print(t)
+        #print(t.checked_type)
+        #input('typechecked1')
+
+        return temp
     return _impl
 
 
 def _nms(prelude):
     def _impl(inputs, input_types):
-        print('in impl')
+        #input('in nms impl')
         #max_output_size = int(np.atleast_1d(inputs[2].data.asnumpy()
         #                                    .astype("int64"))[0])
 
@@ -1836,6 +1988,13 @@ def _nms(prelude):
         print(scores)
         print(type(scores))
 
+        #input("ba00")
+        #t1 = _infer_type(scores).check_type
+        #print('t1')
+        t1 = _infer_type_with_prelude(scores, prelude)
+        print(t1)
+        #input("ba00a")
+
         #scores = _op.transform.expand_dims(scores, -1, 1)
 
         scores = AttrCvt(op_name="expand_dims",
@@ -1843,20 +2002,20 @@ def _nms(prelude):
 
         #See if these inputs are fucked
         #print('checking input infer stuff')
-        input("a00")
+        #input("a00")
         #t1 = _infer_type(scores).check_type
         #print('t1')
         t1 = _infer_type_with_prelude(scores, prelude)
         print(t1)
-        input("a00a")
+        #input("a00a")
         #print('s1')
         #s1 = _infer_shape(scores, prelude.mod)
         #print(s1)
-        input('a001')
+        #input('a001')
         #t2= _infer_type(boxes).checked_type
         t2 = _infer_type_with_prelude(boxes, prelude)
         print(t2)
-        input('a001a')
+        #input('a001a')
         #s2 = _infer_shape(boxes, prelude.mod)
         #print(s2)
 
@@ -1864,14 +2023,14 @@ def _nms(prelude):
         data = _op.expand_dims(data, 0, 1)
 
         #Seew if concat data is messed up
-        input("a0")
+        #input("a0")
         print('check inputs to get val count')
         #t3 = _infer_type(data).checked_type
         t3 = _infer_type_with_prelude(data, prelude)
         print(t3)
         s3 = _infer_shape(data, prelude.mod)
         print(s3)
-        input("a0a")
+        #input("a0a")
 
         ct, data, indices = get_relay_op('get_valid_counts')(data,
                                                      #score_threshold=float('-inf'),
@@ -1911,7 +2070,14 @@ def _nms(prelude):
 
         print('out of nms call')
         print(type(nms_ret))
+        """
+        print(nms_ret)
+        print(_infer_value_simulated(nms_ret[0], {}))
+        input('nms out0')
 
+        print(_infer_value_simulated(nms_ret[1], {}))
+        input('nms out1')
+        """
         # squeeze it, TF NMS is not batched
         size = get_relay_op("squeeze")(nms_ret[1], axis=[1])
         print('size out')
@@ -1920,15 +2086,94 @@ def _nms(prelude):
         data_slice = get_relay_op("squeeze")(nms_ret[0], axis=[0])
         print('data slice out')
         print(data_slice)
+        #print(_infer_value_simulated(data_slice, {}))
+        #input('dataslice1')
 
         # slice to get the dynamic result
         # not sure if we should have this slice
         ret = get_relay_op("strided_slice")(data_slice, begin=_expr.const([0]),
                                             end=size, slice_mode="size")
-        input("dummy breakpoint")
+        #print(ret)
+        #print(_infer_shape(ret))
+        #input("dummy breakpoint")
         return ret
         #return data_slice
     return _impl
+
+"""
+def _index():
+    def _impl(inputs, input_types):
+        print('in index impl')
+        #input('in index')
+
+        #print('inputs')
+        #print(inputs)
+
+        print('inputs0')
+        print(inputs[0])
+        print(type(inputs[0]))
+
+        print('inputs1')
+        #inputs1 cant be printed
+        print(inputs[1][0])
+        print(type(inputs[1]))
+
+        return inputs[0][inputs[1]]
+
+    return _impl
+"""
+
+def _index():
+    def _impl(inputs, input_types):
+        #input('in index impl')
+        data = inputs[0]
+
+        print('inputs1')
+        print(type(inputs[1]))
+        #inputs1 cant be printed
+        #print(inputs[1])
+        for l in inputs[1]:
+            print('llll')
+            print(l)
+            print(type(l))
+
+        indices = _op.cast(inputs[1][0], "int32")
+
+        temp = _op.transform.take(data, indices=indices)
+
+        return temp
+    return _impl
+
+
+def _roi_align(prelude):
+    def _impl(inputs, input_types):
+        #input('in roi impl')
+
+        data = inputs[0]
+        print(data)
+        #input('data')
+        boxes = inputs[1]
+        print(boxes)
+        #box = _infer_value_simulated(boxes, {})
+        #print(box)
+        #input('boxes')
+
+        # Looking at graph, different ordering...
+        #output_size = inputs[2]
+        #spatial_scale = inputs[3]
+
+        output_size = (inputs[3], inputs[4])
+        spatial_scale = inputs[2]
+
+        batch_indices = _op.gather(boxes, 1, _expr.const(0))
+        num_boxes = _infer_shape(boxes)
+        print(num_boxes)
+        #input('num boxes')
+        #rois = _op.concatenate([batch_indices, boxes], 1)
+
+        return _op.vision.roi_align(data, boxes, output_size, spatial_scale)
+    return _impl
+
 
 def _pytorch_result_type(dtypes, non_tensor_inputs):
     """This promotes TVM dtypes like PyTorch would"""
@@ -2095,8 +2340,8 @@ def _get_convert_map(prelude):
         "aten::slice"                           : _slice(prelude),
         "aten::split"                           : _split(),
         "aten::split_with_sizes"                : _split_with_sizes(),
-        "aten::select"                          : _select(),
-        "aten::index_select"                    : _select(),
+        "aten::select"                          : _select(prelude),
+        "aten::index_select"                    : _select(prelude),
         "aten::take"                            : _take(),
         "aten::where"                           : _where(),
         "aten::topk"                            : _topk(),
@@ -2233,8 +2478,12 @@ def _get_convert_map(prelude):
         "aten::gather"                          : _gather(),
         "aten::index"                           : _list_getitem(prelude),
         "aten::__and__"                         : _logical_and(),
-        "aten::nonzero"                         : _nonzero(),
+        "aten::nonzero"                         : _nonzero(prelude),
         "torchvision::nms"                      : _nms(prelude),
+        #Untested
+        "torchvision::roi_align"                : _roi_align(prelude),
+        #"aten::index_put_"                      : _index_put(prelude),
+        "aten::clamp_"                          : _clamp(),
     }
     return convert_map
 
@@ -2723,18 +2972,54 @@ def convert_operators(operators, outputs, ret_names, convert_map, prelude, defau
 
         print('in covert')
         print(node_name)
+        print(type(node_name))
         print(operator)
         print(op_node)
+
+        #if node_name == '2440':
+        #    input('2440 node')
+
+        #if node_name == '2432':
+        #    input('2432 node')
+
+        #if operator == "aten::index":
+        #    input('index node')
+
+        #if node_name == 'index0.2':
+        #    input('index0.2')
+
+        #if node_name == 'item0.2':
+        #
+        #    input('item0.2')
 
         if operator == "prim::Constant":
             outputs[node_name] = _get_constant(op_node)
         elif operator == "prim::ListConstruct" and _is_int_seq(inputs):
+            #input('_is_int_seq')
+            print('_is_int_seq')
             outputs[node_name] = _expr.var(node_name, shape=inputs)
         elif operator == "prim::ListConstruct" and _should_construct_dynamic_list(op_node):
+            #input('_should_construct_dynamic_list')
+            print('_should_construct_dynamic_list')
             outputs[node_name] = _convert_to_list_adt(inputs, prelude)
         elif operator == "prim::ListConstruct":
             # This assumes that no more elements will be appended to this list
             # In this case, we keep the Python list
+            #input('ideal case')
+            print('ideal case')
+            print(type(inputs))
+            #print(len(input))
+            for i in inputs:
+                if (node_name == '2440'):
+                    print('input')
+                    print(i)
+                    print(type(i))
+                    #input('asd')
+                    print('inferred type of 2440')
+                    t = _infer_type(i).checked_type
+                    print(_infer_type(i))
+                    print(t)
+                    #input('blah')
             outputs[node_name] = inputs
         elif operator == "prim::TupleConstruct":
             outputs[node_name] = _expr.Tuple(inputs)
@@ -2820,6 +3105,7 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None, default_d
 
     print('torch graph')
     print(graph)
+    input('get graph')
 
     if custom_convert_map:
         convert_map.update(custom_convert_map)
