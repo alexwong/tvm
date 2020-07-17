@@ -1210,8 +1210,28 @@ def _view():
 def _reshape():
     def _impl(inputs, input_types):
         data = inputs[0]
+        print(type(data))
+        print(data)
+
+        print(type(inputs[1]))
+
+        new_shape = []
         if isinstance(inputs[1], list):
-            new_shape = inputs[1]
+            print(len(inputs[1]))
+            for i in inputs[1]:
+                print('an in1')
+                print(i)
+
+                if isinstance(i, int):
+                    new_shape.append(i)
+                elif isinstance(i, _expr.Expr):
+                    temp_shape = _infer_value(i, {})
+                    val = temp_shape.asnumpy()
+                    new_shape.append(int(val))
+                    input('in hrtr')
+
+            #new_shape = inputs[1]
+
         else:
             new_shape = _infer_shape(inputs[1])
         return _op.transform.reshape(data, new_shape)
@@ -1734,10 +1754,11 @@ def _bitwise_not():
         # The input tensor must be of integral or Boolean types.
         # For bool tensors, it computes the logical NOT
         if input_types[0] == "bool":
+            print('log not')
             out = _op.logical_not(_op.cast(data, "bool"))
         else:
+            print('bitwise not')
             out = _op.bitwise_not(_op.cast(data, "int"))
-
         return out
     return _impl
 
@@ -2166,14 +2187,52 @@ def _roi_align(prelude):
         spatial_scale = inputs[2]
 
         batch_indices = _op.gather(boxes, 1, _expr.const(0))
-        num_boxes = _infer_shape(boxes)
+        num_boxes = _infer_shape(boxes, prelude.mod)
         print(num_boxes)
+        #input('check here')
         #input('num boxes')
         #rois = _op.concatenate([batch_indices, boxes], 1)
 
         return _op.vision.roi_align(data, boxes, output_size, spatial_scale)
     return _impl
 
+def _index_put_(prelude):
+    def _impl(inputs, input_types):
+        input('indexput')
+
+        data = inputs[0]
+        print(type(data))
+        print(data)
+        input('in0')
+        indices = inputs[1]
+        print(type(indices))
+        print(len(indices))
+        indices1 = indices[0]
+        print(type(indices1))
+        print(indices1)
+        input('in1')
+
+        #Try inferring the value here
+        temp = _infer_value_simulated(indices1, {})
+        print(temp)
+        input('inferred value of temp')
+
+        values = inputs[2]
+        print(type(values))
+        print(values)
+        input('in2')
+
+        data_shape_orig = _infer_shape(data, prelude.mod)
+        print(data_shape_orig)
+        input('initial shape')
+
+        #Flatten the initial data
+        flattened_data = _op.nn.batch_flatten(data)
+
+        #Map batch indices to flattened indices
+
+        return
+    return _impl
 
 def _pytorch_result_type(dtypes, non_tensor_inputs):
     """This promotes TVM dtypes like PyTorch would"""
@@ -2482,7 +2541,7 @@ def _get_convert_map(prelude):
         "torchvision::nms"                      : _nms(prelude),
         #Untested
         "torchvision::roi_align"                : _roi_align(prelude),
-        #"aten::index_put_"                      : _index_put(prelude),
+        "aten::index_put_"                      : _index_put_(prelude),
         "aten::clamp_"                          : _clamp(),
     }
     return convert_map
@@ -2991,6 +3050,9 @@ def convert_operators(operators, outputs, ret_names, convert_map, prelude, defau
         #if node_name == 'item0.2':
         #
         #    input('item0.2')
+
+        if node_name == 'boxes5.1':
+            input('boxes5.1')
 
         if operator == "prim::Constant":
             outputs[node_name] = _get_constant(op_node)
