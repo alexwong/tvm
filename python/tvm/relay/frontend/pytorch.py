@@ -233,6 +233,7 @@ def _unsqueeze():
 
 def _concatenate(prelude):
     def tensor_array_concat(lst, axis):
+        print('in tensor_array_concat')
         assert axis == 0, "Tensor array concat supported only for axis 0"
         tensor_array, shape = _convert_to_tensor_array(lst, prelude)
         concat_shape = (Any(),) + shape[1:]
@@ -248,10 +249,27 @@ def _concatenate(prelude):
         data = inputs[0]
         axis = inputs[1]
 
+        print('in concat impl')
+        print(type(data))
+        print('axis')
+        print(type(axis))
+        print(axis)
+
+        cnt = 0
+        if isinstance(data, list):
+            for l in data:
+                print('elem '+str(cnt))
+                print(l)
+                cnt = cnt+1
+                #if (cnt>10):
+                #    input('woah dere')
+
         if not isinstance(data, list):
+            print('tensory_array_concat')
             return tensor_array_concat(data, axis)
 
         if isinstance(data, _expr.Expr):
+            print('data concat')
             data = [data]
 
         return _op.tensor.concatenate(data, int(axis))
@@ -311,13 +329,12 @@ def _slice(prelude):
             inferred_shape = _infer_shape(data, prelude.mod)
             print('sd')
             end = []
-            print(inferred_shape)
-            #input('in slice infer shape')
             for infer in inferred_shape:
-                print('in slice infer shape')
-                print(infer)
-                print(type(infer))
-                end.append(infer)
+                print('asd')
+                if isinstance(infer, tvm.tir.expr.Any):
+                    end.append(-1)
+                else:
+                    end.append(int(infer))
             print('asfda')
             if isinstance(data, _expr.Var):
                 print('adsd')
@@ -458,7 +475,13 @@ def _take():
 def _topk():
     def _impl(inputs, input_types):
         data = inputs[0]
-        k = inputs[1]
+        if not isinstance(inputs[1], int):
+            mod = tvm.IRModule()
+            mod["main"] = inputs[1]
+            mod = tvm.relay.transform.FoldConstant()(mod)
+            k = int(mod["main"].body.data.asnumpy())
+        else:
+            k = int(inputs[1])
         axis = int(inputs[2])
         is_ascend = not bool(inputs[3])
         sort = bool(inputs[4])
@@ -848,6 +871,11 @@ def _convolution():
 
         data = inputs[0]
         weight = inputs[1]
+
+        #print('in conv')
+        #print(type(weight))
+        #input('conv')
+
         bias = inputs[2]
         strides = inputs[3]
         padding = inputs[4]
@@ -1228,7 +1256,7 @@ def _reshape():
                     temp_shape = _infer_value(i, {})
                     val = temp_shape.asnumpy()
                     new_shape.append(int(val))
-                    input('in hrtr')
+                    #input('in hrtr')
 
             #new_shape = inputs[1]
 
@@ -2683,6 +2711,8 @@ def _get_operator_nodes(nodes):
     ops = []
     # Traverse nodes and add to graph
     for node in nodes:
+        print('node')
+        print(node.outputsSize())
         if node.outputsSize() > 1:
             node_name = "_".join(_get_output_names(node))
         else:
@@ -3038,8 +3068,8 @@ def convert_operators(operators, outputs, ret_names, convert_map, prelude, defau
         #
         #    input('item0.2')
 
-        if node_name == 'boxes5.1':
-            input('boxes5.1')
+        if node_name == '2811':
+            input('2811')
 
         if operator == "prim::Constant":
             outputs[node_name] = _get_constant(op_node)
@@ -3168,9 +3198,14 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None, default_d
                                     default_dtype=default_dtype,
                                     is_module=is_module)
     param_vars, tensors, packed_param_map = convert_params(graph, params)
+
     tvm_params = {k: tvm.nd.array(v) for k, v in tensors.items()}
 
     outputs.update(param_vars)
+
+    #print(type(param_vars))
+    #input('params')
+
     ret_name = _get_input_names(graph.return_node())
 
     # For quantized models
@@ -3188,5 +3223,9 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None, default_d
                             default_dtype=default_dtype)
 
     mod["main"] = tvm.relay.Function(_analysis.free_vars(ret[0]), ret[0])
+
+    print('final relay mod')
+    print(mod)
+    input('printed mod')
 
     return mod, tvm_params

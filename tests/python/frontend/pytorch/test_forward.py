@@ -174,7 +174,7 @@ def verify_model(model_name, input_data=[],
     if isinstance(baseline_outputs, tuple):
         baseline_outputs = tuple(out.cpu().numpy() for out in baseline_outputs)
     else:
-        baseline_outputs = (baseline_outputs.cpu().numpy(),)
+        baseline_outputs = baseline_outputs#(baseline_outputs.cpu().numpy(),)
 
     trace = torch.jit.trace(baseline_model, baseline_input)
     if isinstance(baseline_model, torch.nn.Module):
@@ -2644,6 +2644,13 @@ def test_rando():
             list.append(args[1])
             list.append(args[2])
 
+            list1 = []
+            list1.append(1)
+            list1.append(2)
+            list1.append(3)
+
+            return list1
+
     data = torch.randn(2,2)
     verify_model(test().float().eval(), input_data=[data, data, data])
 
@@ -2919,7 +2926,8 @@ if __name__ == "__main__":
     test_quantized_imagenet()
 
     # Test simple conditionals and loop
-    test_control_flow()
+    test_control
+    _flow()
     test_simple_rnn()
 
     # More complex recurrent models
@@ -2932,7 +2940,12 @@ if __name__ == "__main__":
     """
 
     #test_forward_nms()
-    test_forward_roi_align()
+    #test_forward_roi_align()
     #test_fasterrcnn()
 
     #test_rando()
+
+    #from lstm_test import custom_lstm_test
+    #custom_lstm_test()
+
+    test_resnet18()
