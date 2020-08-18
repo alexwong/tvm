@@ -65,8 +65,8 @@ mod, params = relay.frontend.from_pytorch(scripted_model, input_shapes)
 with tvm.transform.PassContext(opt_level=3, disabled_pass=None):
     vm_exec = relay.vm.compile(mod, target="llvm", params=params)
 from tvm.runtime.vm import VirtualMachine
-vm = VirtualMachine(vm_exec)
-vm.init(tvm.cpu())
+vm = VirtualMachine(vm_exec, tvm.cpu())
+#vm.init(tvm.cpu())
 inputs1 = {}
 for e, i in zip(input_names, inputs):
     inputs1[e] = tvm.nd.array(i)

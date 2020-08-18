@@ -332,7 +332,8 @@ def _slice(prelude):
             for infer in inferred_shape:
                 print('asd')
                 if isinstance(infer, tvm.tir.expr.Any):
-                    end.append(-1)
+                    #end.append(-1)
+                    end.append((infer))
                 else:
                     end.append(int(infer))
             print('asfda')
@@ -372,6 +373,12 @@ def _slice(prelude):
 
         if any(map(lambda s: isinstance(s, tvm.tir.expr.Any), end)):
             print('got an any in new end')
+
+            print('new end')
+            print(end)
+            print(type(end))
+            input('dynmaic slice')
+
             return _impl_dynamic(data, begin, end, strides, input_types)
 
         return _op.transform.strided_slice(data,
@@ -2759,6 +2766,11 @@ def _get_relay_input_vars(graph, input_shapes, prelude, is_module=True, default_
 
     def get_relay_ty(ishape, pt_type):
         if pt_type.kind() == 'TensorType':
+            print('tensortype')
+            print(pt_type)
+            print(pt_type.kind)
+            print(ishape)
+            print(type(ishape))
             if not (_is_int_seq(ishape) or len(ishape) == 0):
                 msg = "Shape for Tensors must be lists of ints"
                 raise RuntimeError(msg)
@@ -2777,6 +2789,11 @@ def _get_relay_input_vars(graph, input_shapes, prelude, is_module=True, default_
             return TupleType([get_relay_ty(elem, pt_t)
                               for elem, pt_t in zip(ishape, pt_type.elements())])
         elif pt_type.kind() == 'ListType':
+            print('listype')
+            print(pt_type)
+            print(pt_type.kind)
+            print(ishape)
+            print(type(ishape))
             if not isinstance(ishape, list):
                 msg = "Shapes for lists must be lists"
                 raise RuntimeError(msg)
@@ -3077,12 +3094,17 @@ def convert_operators(operators, outputs, ret_names, convert_map, prelude, defau
         #if node_name == 'index0.2':
         #    input('index0.2')
 
-        #if node_name == 'item0.2':
-        #
-        #    input('item0.2')
+        #if node_name == '2337':
+        #    input('2337')
 
-        if node_name == '2811':
-            input('2811')
+        #if node_name == '2338':
+        #    input('2338')
+
+        #if node_name == 'keep0.1':
+        #    input('keep0.1')
+
+        #if node_name == 'keep0.1':
+        #    input('keep0.1')
 
         if operator == "prim::Constant":
             outputs[node_name] = _get_constant(op_node)
@@ -3197,7 +3219,8 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None, default_d
 
     print('torch graph')
     print(graph)
-    input('get graph')
+    print(type(graph))
+    #input('get graph')
 
     if custom_convert_map:
         convert_map.update(custom_convert_map)
@@ -3239,6 +3262,6 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None, default_d
 
     print('final relay mod')
     print(mod)
-    input('printed mod')
+    #input('printed mod')
 
     return mod, tvm_params
