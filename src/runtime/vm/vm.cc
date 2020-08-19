@@ -104,10 +104,19 @@ std::vector<int64_t> ToShape(NDArray shape_tensor) {
 
 PackedFunc VirtualMachine::GetFunction(const std::string& name,
                                        const ObjectPtr<Object>& sptr_to_self) {
+
+  LOG(INFO) << "packedfunc name in getf" << name;
+
   if (name == "invoke") {
     return PackedFunc([sptr_to_self, this](TVMArgs args, TVMRetValue* rv) {
+
+
+
       CHECK(exec_) << "The executable is not created yet.";
       std::string func_name = args[0];
+
+      LOG(INFO) << "packedfunc name in invoke" << func_name;
+
       auto git = exec_->global_map.find(func_name);
       CHECK(git != exec_->global_map.end())
           << "Cannot find function " << func_name << " in the executable";
@@ -226,6 +235,9 @@ ObjectRef VirtualMachine::Invoke(const std::string& name, const std::vector<Obje
 
 void VirtualMachine::InvokePacked(Index packed_index, const PackedFunc& func, Index arg_count,
                                   Index output_size, const std::vector<ObjectRef>& args) {
+
+  //LOG(INFO) << "packedfunc name";
+
   size_t arity = 0;
   for (Index i = 0; i < arg_count; i++) {
     if (const auto* obj = args[i].as<ADTObj>()) {
@@ -270,10 +282,12 @@ void VirtualMachine::LoadExecutable(const Executable* exec) {
     auto packed_index = static_cast<size_t>(it.second);
     if (packed_funcs_.size() <= packed_index) {
       packed_funcs_.resize(packed_index + 1);
+      packed_names_.resize(packed_index + 1);
     }
     tvm::runtime::PackedFunc pf = lib.GetFunction(packed_name, true);
     CHECK(pf != nullptr) << "Cannot find function in module: " << packed_name;
     packed_funcs_[packed_index] = pf;
+    packed_names_[packed_index] = packed_name;
   }
   for (size_t i = 0; i < packed_funcs_.size(); ++i) {
     CHECK(packed_funcs_[i] != nullptr) << "Packed function " << i << " is not initialized";
@@ -388,7 +402,12 @@ void VirtualMachine::RunLoop() {
         goto main_loop;
       }
       case Opcode::InvokePacked: {
-        DLOG(INFO) << "InvokedPacked " << instr.packed_index << " arity=" << instr.arity;
+        LOG(INFO) << "InvokedPacked: " << instr.packed_index
+                       << "-th function: " << packed_names_[instr.packed_index]
+                       << " arity=" << instr.arity;
+
+
+
         CHECK_LE(instr.packed_index, packed_funcs_.size());
         const auto& func = packed_funcs_[instr.packed_index];
         const auto& arity = instr.arity;
