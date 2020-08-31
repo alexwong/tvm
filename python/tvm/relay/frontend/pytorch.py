@@ -360,9 +360,11 @@ def _slice(prelude):
             end[dim] = min(end[dim], int(inputs[3]))
         else:
             if isinstance(inputs[3], _expr.Call):
-                end[dim] = np.asscalar(_infer_value(inputs[3], {}).asnumpy().astype(np.int))
+                #end[dim] = np.asscalar(_infer_value(inputs[3], {}).asnumpy().astype(np.int))
+                target_end = np.asscalar(_infer_value(inputs[3], {}).asnumpy().astype(np.int))
             else:
-                end[dim] = inputs[3]
+                #end[dim] = inputs[3]
+                target_end = inputs[3]
 
         print('new end')
         print(end)
@@ -377,7 +379,7 @@ def _slice(prelude):
             print('new end')
             print(end)
             print(type(end))
-            input('dynmaic slice')
+            #input('dynmaic slice')
 
             return _impl_dynamic(data, begin, end, strides, input_types)
 
@@ -385,7 +387,7 @@ def _slice(prelude):
                                            begin=_expr.const(begin),
                                            end=_expr.const(end),
                                            strides=_expr.const(strides),
-                                           slice_mode="size")
+                                           slice_mode="end")
     return _impl
 
 def _split():
@@ -2006,7 +2008,7 @@ def _nonzero(prelude):
         return temp
     return _impl
 
-
+"""
 def _nms(prelude):
     def _impl(inputs, input_types):
         #input('in nms impl')
@@ -2126,14 +2128,12 @@ def _nms(prelude):
 
         print('out of nms call')
         print(type(nms_ret))
-        """
-        print(nms_ret)
-        print(_infer_value_simulated(nms_ret[0], {}))
-        input('nms out0')
+        #print(nms_ret)
+        #print(_infer_value_simulated(nms_ret[0], {}))
+        #input('nms out0')
 
-        print(_infer_value_simulated(nms_ret[1], {}))
-        input('nms out1')
-        """
+        #print(_infer_value_simulated(nms_ret[1], {}))
+        #input('nms out1')
         # squeeze it, TF NMS is not batched
         size = get_relay_op("squeeze")(nms_ret[1], axis=[1])
         print('size out')
@@ -2154,6 +2154,52 @@ def _nms(prelude):
         #input("dummy breakpoint")
         return ret
         #return data_slice
+    return _impl
+"""
+from .common import AttrCvt, get_relay_op
+def _nms(prelude):
+    def _impl(inputs, input_types):
+        boxes = inputs[0]
+        scores = inputs[1]
+        iou_threshold = inputs[2]
+
+        # Generate data with shape (1, num_anchors, 5)
+        scores = AttrCvt(op_name="expand_dims",
+                         extras={'axis': -1, 'num_newaxis': 1})([scores], {})
+
+        # Prepare input data for get_valid_counts
+        data = _op.concatenate([scores, boxes], -1)
+        data = _op.expand_dims(data, 0, 1)
+        # Leverage get_valid_counts to sort the data and clear invalid boxes
+        ct, data, indices = get_relay_op('get_valid_counts')(data,
+                                                             score_threshold=-1.0,
+                                                             id_index=-1,
+                                                             score_index=0)
+
+        # Perform Non-Maximum Suppression,
+        # PyTorch NMS doesn't have parameter top_k and max_output_size
+        score_index = 0
+        top_k = max_out_size = -1
+        nms_ret = get_relay_op('non_max_suppression')(data=data,
+                                                      valid_count=ct,
+                                                      indices=indices,
+                                                      max_output_size=max_out_size,
+                                                      iou_threshold=iou_threshold,
+                                                      force_suppress=True,
+                                                      top_k=top_k,
+                                                      coord_start=1,
+                                                      score_index=score_index,
+                                                      id_index=-1,
+                                                      return_indices=True,
+                                                      invalid_to_bottom=False)
+
+        # squeeze the two outputs of nms for strided_slice
+        size = get_relay_op("squeeze")(nms_ret[1], axis=[1])
+        data_slice = get_relay_op("squeeze")(nms_ret[0], axis=[0])
+
+        # strided slice to get the dynamic result
+        return get_relay_op("strided_slice")(data_slice, begin=_expr.const([0]),
+                                             end=size, slice_mode="size")
     return _impl
 
 """
@@ -2196,6 +2242,8 @@ def _index():
         indices = _op.cast(inputs[1][0], "int32")
 
         temp = _op.transform.take(data, indices=indices)
+
+        input('its in inptu')
 
         return temp
     return _impl
@@ -3220,7 +3268,7 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None, default_d
     print('torch graph')
     print(graph)
     print(type(graph))
-    #input('get graph')
+    input('get graph')
 
     if custom_convert_map:
         convert_map.update(custom_convert_map)
@@ -3230,6 +3278,8 @@ def from_pytorch(script_module, input_shapes, custom_convert_map=None, default_d
 
     is_module = isinstance(script_module, torch.jit.ScriptModule)
     params = script_module.state_dict() if is_module else {}
+    print(params)
+    #input('sgtate dict')
     outputs = _get_relay_input_vars(graph, input_shapes, prelude,
                                     default_dtype=default_dtype,
                                     is_module=is_module)

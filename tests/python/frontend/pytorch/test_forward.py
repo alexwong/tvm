@@ -2996,4 +2996,4 @@ if __name__ == "__main__":
     #from lstm_test import custom_lstm_test
     #custom_lstm_test()
 
-    test_resnet18()
+    #test_resnet18()
