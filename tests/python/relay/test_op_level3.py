@@ -714,6 +714,89 @@ def test_meshgrid():
     # Length 0 signifies scalar.
     verify_meshgrid([3, 5, 0])
 
+def test_interpolate():
+
+    def _interpolate_1d(x, xp, fp):
+
+        #lenx = x.shape[0]
+        #lenxp = xp.shape[0]
+        #minxp = xp[0]
+        #maxxp = xp[lenxp-1]
+
+        lenx= len(x)
+        lenxp = len(xp)
+        minxp = xp[0]
+        maxxp = xp[lenxp-1]
+
+        print('in interp')
+        print(lenx)
+        print(lenxp)
+        print(minxp)
+        print(maxxp)
+
+        #out = output_tensor(x.shape, x.dtype)
+        out = [None]*lenx
+
+        #For each x, we need to search through xp to get the left and right coords
+        #Note everything is sorted
+        for i in range(lenx):
+            for j in range(lenxp):
+                if x[i] <= minxp:
+                    out[i] = fp[0]
+                elif x[i] >= maxxp:
+                    out[i] = fp[lenxp-1]
+                elif j>0 and x[i] >= xp[j-1] and x[i] < xp[j]:
+                    out[i] = fp[j-1] + (x[i] - xp[j-1])*((fp[j]-fp[j-1])/(xp[j]-xp[j-1]))
+
+        print('in interp out')
+        print(out)
+        return out
+
+
+    def verify_interpolate(x, xp, fp):
+        input_vars = [relay.var("x", relay.TensorType([len(x)] ,"float32")),
+                      relay.var("xp", relay.TensorType([len(xp)] ,"float32")),
+                      relay.var("fp", relay.TensorType([len(fp)] ,"float32"))]
+        input_data = [x,xp,fp]
+
+        out = relay.op.interpolate(input_vars[0], input_vars[1], input_vars[2])
+        func = relay.Function(input_vars, out)
+
+        ref_res = np.interp(x, xp, fp)
+
+        new_res = _interpolate_1d(x, xp, fp)
+        print(new_res)
+        input('new res')
+
+        for target, ctx in [("llvm", tvm.cpu())]:
+            for kind in ["graph", "debug"]:
+                intrp = relay.create_executor(kind, ctx=ctx, target=target)
+
+                print('input_data')
+                print(input_data)
+
+                op_res = intrp.evaluate(func)(*input_data)
+
+                print('op_res')
+                print(op_res)
+                print('ref_res')
+                print(ref_res)
+
+                tvm.testing.assert_allclose(
+                    op_res.asnumpy(), ref_res, rtol=1e-5)
+
+    xp = [1.0, 2.0, 3.0]
+    fp = [3.0, 2.0, 0.0]
+    verify_interpolate([2.5], xp, fp)
+
+    verify_interpolate([0.0, 1.0, 1.5, 2.72, 3.14], xp, fp)
+
+    xp = np.linspace(0, 2*np.pi, 10).astype('float32')
+    fp = np.sin(xp).astype('float32')
+
+    verify_interpolate(np.linspace(0, 2*np.pi, 50).astype('float32'), xp, fp)
+
+
 
 @tvm.testing.uses_gpu
 def test_tile():
@@ -1238,6 +1321,7 @@ def test_adv_index():
 
 
 if __name__ == "__main__":
+    """"
     test_cast()
     test_zeros_ones()
     test_unary_identity()
@@ -1274,3 +1358,9 @@ if __name__ == "__main__":
     test_sparse_to_dense()
     test_fixed_point_multiply()
     test_adv_index()
+    """
+
+    #print('test scatter')
+    #test_scatter()
+    print('test interp')
+    test_interpolate()

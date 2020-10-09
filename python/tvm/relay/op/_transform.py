@@ -115,6 +115,15 @@ def compute_scatter_add(attrs, inputs, output_type):
 
 _reg.register_schedule("scatter_add", strategy.schedule_scatter_add)
 
+# interpolate
+@_reg.register_compute("interpolate")
+def compute_interpolate(attrs, inputs, output_type):
+    """Compute definition of interpolate"""
+    return [topi.interpolate(inputs[0], inputs[1], inputs[2])]
+
+
+_reg.register_schedule("interpolate", strategy.schedule_interpolate)
+
 #####################
 #  Shape functions  #
 #####################
@@ -413,6 +422,9 @@ def argwhere_shape_func(attrs, inputs, out_ndims):
 _reg.register_shape_func("scatter", False, elemwise_shape_func)
 _reg.register_shape_func("scatter_add", False, elemwise_shape_func)
 
+@_reg.register_shape_func("interpolate", True)
+def interpolate_shape_func(attrs, inputs, _):
+    return inputs[0].shape
 
 @script
 def _layout_transform_shape_func(

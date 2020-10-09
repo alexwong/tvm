@@ -496,6 +496,9 @@ def meshgrid(data, indexing="ij"):
     ret_size = len(data)
     return TupleWrapper(_make.meshgrid(Tuple(data), indexing), ret_size)
 
+def interpolate(x, xp, fp, mode="none"):
+    return _make.interpolate(x, xp, fp)
+
 
 def repeat(data, repeats, axis):
     """Repeats elements of an array.
