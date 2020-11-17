@@ -427,6 +427,7 @@ _reg.register_shape_func("scatter_add", False, elemwise_shape_func)
 
 _reg.register_shape_func("interpolate", False, elemwise_shape_func)
 
+
 @script
 def _layout_transform_shape_func(
     data_shape, out_layout_len, dst_equal_list, dst_mul_list, dst_div_list, dst_mix_list

@@ -347,7 +347,10 @@ def _qt_transform_col(X_col, quantiles, inverse, qt, references):
 
     if not inverse:
         lower_bound_x = _op.take(quantiles, indices=_expr.const(0))
-        upper_bound_x = _op.take(quantiles, indices=_op.subtract(_op.take(x_shape_n, indices=_expr.const([0])), _expr.const(1)))
+        upper_bound_x = _op.take(
+            quantiles,
+            indices=_op.subtract(_op.take(x_shape_n, indices=_expr.const([0])), _expr.const(1)),
+        )
         lower_bound_y = _expr.const(0)
         upper_bound_y = _expr.const(1)
     else:
@@ -356,12 +359,18 @@ def _qt_transform_col(X_col, quantiles, inverse, qt, references):
         lower_bound_x = _expr.const(0)
         upper_bound_x = _expr.const(1)
 
-    lower_bounds_idx = _op.equal(_op.cast(X_col, "float32"), _op.broadcast_to(lower_bound_x, x_shape_n))
-    upper_bounds_idx = _op.equal(_op.cast(X_col, "float32"), _op.broadcast_to(upper_bound_x, x_shape_n))
+    lower_bounds_idx = _op.equal(
+        _op.cast(X_col, "float32"), _op.broadcast_to(lower_bound_x, x_shape_n)
+    )
+    upper_bounds_idx = _op.equal(
+        _op.cast(X_col, "float32"), _op.broadcast_to(upper_bound_x, x_shape_n)
+    )
 
     isfinite_mask = _op.logical_not(_op.isnan(X_col))
 
-    X_col_finite = _op.reshape(_op.multiply(X_col,  _op.cast(isfinite_mask, 'float32')), newshape=(-1))
+    X_col_finite = _op.reshape(
+        _op.multiply(X_col,  _op.cast(isfinite_mask, 'float32')), newshape=(-1)
+    )
 
     if not inverse:
         interp1 = _op.interpolate(
@@ -382,18 +391,17 @@ def _qt_transform_col(X_col, quantiles, inverse, qt, references):
         interp_out = _op.interpolate(X_col_finite, qt.references_, quantiles)
         mul_out = interp_out
 
-
     out = _op.where(_op.reshape(isfinite_mask, newshape=(-1)), mul_out, X_col_finite)
 
     upper_bound_y = _op.full(upper_bound_y, x_shape_n, dtype="float32")
-    out = _op.where(_op.reshape(upper_bounds_idx, newshape=-(1)),
-                                _op.reshape(upper_bound_y, newshape=(-1)),
-                                out)
+    out = _op.where(
+        _op.reshape(upper_bounds_idx, newshape=-(1)), _op.reshape(upper_bound_y, newshape=(-1)), out
+    )
 
     lower_bound_y = _op.full(lower_bound_y, x_shape_n, dtype="float32")
-    out = _op.where(_op.reshape(lower_bounds_idx, newshape=-(1)),
-                                _op.reshape(lower_bound_y, newshape=(-1)),
-                                out)
+    out = _op.where(
+        _op.reshape(lower_bounds_idx, newshape=-(1)), _op.reshape(lower_bound_y, newshape=(-1)), out
+    )
 
     return _op.reshape(out, newshape=(-1,1))
 
