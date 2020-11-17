@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 # pylint: disable=invalid-name, import-self, len-as-condition, unused-argument, too-many-lines
-# pylint: disable=import-outside-toplevel, used-before-assignment
+# pylint: disable=import-outside-toplevel, used-before-assignment, unused-import
 """Scikit-learn frontend."""
 import numpy as np
 import tvm
