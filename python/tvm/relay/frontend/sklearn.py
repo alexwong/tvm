@@ -369,7 +369,7 @@ def _qt_transform_col(X_col, quantiles, inverse, qt, references):
     isfinite_mask = _op.logical_not(_op.isnan(X_col))
 
     X_col_finite = _op.reshape(
-        _op.multiply(X_col,  _op.cast(isfinite_mask, "float32")), newshape=(-1)
+        _op.multiply(X_col, _op.cast(isfinite_mask, "float32")), newshape=(-1)
     )
 
     if not inverse:
